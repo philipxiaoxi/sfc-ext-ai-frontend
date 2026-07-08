@@ -1,0 +1,42 @@
+declare module 'sfc-common/components' {
+  import type { Component } from 'vue'
+
+  export const AlertDialog: Component
+  export const BaseDialog: Component
+  export const BaseForm: Component
+  export const BaseView: Component
+  export const ConfigForm: Component
+  export const DarkSwitch: Component
+  export const DeleteConfirm: Component
+  export const EmptyTip: Component
+  export const FileIcon: Component
+  export const FileMenu: Component
+  export const FileOpenSelector: Component
+  export const FormSelect: Component
+  export const GridMenu: Component
+  export const LoadingMask: Component
+  export const MultiLineText: Component
+  export const NotFoundTip: Component
+  export const PhoneInput: Component
+  export const SelectArea: Component
+  export const SnackBar: Component
+  export const StickyContainer: Component
+  export const TextInput: Component
+  export const UserFileBrowser: Component
+  export const FileAttribute: Component
+  export const VideoPlayer: Component
+  export const DateTip: Component
+  export const SimpleTextarea: Component
+  export const FormTextarea: Component
+  export const DebugConsole: Component
+  export const LoadingDialog: Component
+  export const CommonIcon: Component
+  export const CommonPagination: Component
+  export const PathSelector: Component
+  export const BootLoaderVue: Component
+  export const MarkdownView: Component
+  export const MarkdownEditor: Component
+  export const MarkdownInput: Component
+  export const ChapterTree: Component
+  export * from 'sfc-common/components'
+}

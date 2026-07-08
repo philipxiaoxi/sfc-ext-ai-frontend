@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "useDefineForClassFields": true,
+    "allowSyntheticDefaultImports": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "allowJs": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "lib": ["esnext", "dom"],
+    "skipLibCheck": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "sfc-common/*": ["./types/sfc-common/*"]
+    }
+  },
+  "include": ["types/globals.d.ts", "src/**/*.ts", "src/**/*.vue", "types/**/*.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
