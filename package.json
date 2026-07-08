@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
+  "scripts": {
+    "build": "node ../../scripts/build-ext.mjs ai"
+  },
   "dependencies": {
     "@microsoft/fetch-event-source": "^2.0.1"
   }
