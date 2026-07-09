@@ -1,7 +1,12 @@
 import AiChatDialog from './components/AiChatDialog.vue'
+import LlmProviderManager from './components/LlmProviderManager.vue'
 
 window.bootContext.addProcessor({
   taskName: '注册AI助手',
+  execute(app) {
+    // 注册 LLM 提供商管理组件到全局，可在模板中通过 <LlmProviderManager> 使用
+    app.component(LlmProviderManager.name as string, LlmProviderManager)
+  },
   /** 使用项目标准的 dyncmount 动态挂载，自带 vuetify 上下文 */
   onFinish() {
     try {
