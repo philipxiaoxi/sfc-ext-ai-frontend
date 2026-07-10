@@ -17,6 +17,7 @@ import type { ChatRequest, LlmResponse } from './chat-protocol'
  * 5. 连接关闭 / 异常时由 WebSocket 自身生命周期管理
  */
 export interface AiChatSession {
+
   /**
    * 发送一条请求消息给服务端。
    *
@@ -60,8 +61,10 @@ export interface AiChatSession {
    *
    * 发送 START_SESSION 消息，这是 WebSocket 连接建立后的第一条消息，
    * 且每个连接仅允许发送一次。
+   *
+   * @param sessionId 可选的会话 ID，不传则由服务端生成 UUID
    */
-  start(): void
+  start(sessionId?: string): void
 
   /**
    * 停止当前 LLM 响应。
@@ -69,6 +72,20 @@ export interface AiChatSession {
    * 发送 STOP 消息，服务端会停止正在进行的流式生成并回复 DONE。
    */
   stop(): void
+
+  /**
+   * 注册连接关闭回调。当 WebSocket 连接关闭时调用此函数。
+   *
+   * @param handler 连接关闭后的回调函数，可选参数为关闭事件对象
+   *
+   * @example
+   * ```ts
+   * session.onClose((event) => {
+   *   console.log('连接已关闭, code:', event.code)
+   * })
+   * ```
+   */
+  onClose(handler: (event: CloseEvent) => void): void
 }
 
 /**
@@ -110,6 +127,9 @@ class AiChatSessionImpl implements AiChatSession {
   /** 当前注册的消息处理函数 */
   private handler: ((msg: LlmResponse) => void) | null = null
 
+  /** 当前注册的连接关闭回调函数 */
+  private closeHandler: ((event: CloseEvent) => void) | null = null
+
   /**
    * @param ws 已建立连接的 WebSocket 实例
    */
@@ -125,6 +145,11 @@ class AiChatSessionImpl implements AiChatSession {
         console.error('[AiChatSession] 消息反序列化失败:', e, event.data)
       }
     }
+
+    // 连接关闭时派发给注册的 closeHandler
+    this.ws.onclose = (event: CloseEvent) => {
+      this.closeHandler?.(event)
+    }
   }
 
   send(request: ChatRequest): void {
@@ -136,8 +161,12 @@ class AiChatSessionImpl implements AiChatSession {
     this.handler = handler
   }
 
-  start(): void {
-    this.send({ type: 'START_SESSION', data: {} })
+  onClose(handler: (event: CloseEvent) => void): void {
+    this.closeHandler = handler
+  }
+
+  start(sessionId?: string): void {
+    this.send({ type: 'START_SESSION', data: sessionId ? { sessionId } : {} })
   }
 
   stop(): void {

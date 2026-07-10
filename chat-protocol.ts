@@ -20,6 +20,7 @@ export type UserMessageType = 'START_SESSION' | 'CHAT' | 'TOOL_ACK' | 'STOP'
 
 /** 服务端消息类型枚举（对应后端 LlmMessageType） */
 export type LlmMessageType =
+  | 'SESSION_ACK'
   | 'TOOL_CALL'
   | 'TOOL_CALL_REQ'
   | 'THINKING_START'
@@ -32,7 +33,14 @@ export type LlmMessageType =
 
 /** START_SESSION 消息 payload */
 export interface StartSessionPayload {
-  // 当前无字段，预留后续扩展
+  /** 可选的会话 ID，不传则由服务端生成 UUID */
+  sessionId?: string
+}
+
+/** SESSION_ACK 消息 payload */
+export interface SessionAckPayload {
+  /** 服务端确认的会话 ID */
+  sessionId: string
 }
 
 /** CHAT 消息 payload */
@@ -95,6 +103,7 @@ export type ChatRequest =
  * ```
  */
 export type LlmResponse =
+  | { type: 'SESSION_ACK'; data: SessionAckPayload }
   | { type: 'TEXT'; data: TextPayload }
   | { type: 'THINKING_START' }
   | { type: 'THINKING_END' }

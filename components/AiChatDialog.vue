@@ -87,6 +87,7 @@ import { ref } from 'vue'
 import type { ChatMessage } from '../model'
 import { MarkdownView } from 'sfc-common/components'
 import { aiChatService, AiChatSession } from '../AiChatService'
+import SfcUtils from 'sfc-common/utils/SfcUtils'
 
 
 const open = ref(false)
@@ -94,6 +95,7 @@ const inputText = ref('')
 const messages = ref<ChatMessage[]>([])
 
 let chatSession: AiChatSession | null = null
+let chatSessionId: string
 async function ensureSession() {
   if (chatSession) {
     return chatSession
@@ -104,8 +106,15 @@ async function ensureSession() {
     if (resp.type == 'TEXT') {
       aiMsg.content += resp.data.content
     } else if (resp.type == 'ERROR') {
-      aiMsg.content += `ERROR: ${resp.data.message}`
+      SfcUtils.snackbar(resp.data.message)
+    } else if (resp.type == 'SESSION_ACK') {
+      chatSessionId = resp.data.sessionId
     }
+  })
+  chatSession.onClose(() => {
+    SfcUtils.alert('AI 聊天连接已断开')
+    chatSession = null
+    isStarted = false
   })
   return chatSession
 }
@@ -136,7 +145,7 @@ async function sendMessage() {
 
   const s = await ensureSession()
   if (!isStarted) {
-    s.start()
+    s.start(chatSessionId)
     isStarted = true
   }
   s.send({
