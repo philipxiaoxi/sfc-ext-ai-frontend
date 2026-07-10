@@ -43,8 +43,7 @@
             :class="['message-bubble', msg.role === 'user' ? 'bubble-user' : 'bubble-ai']"
           >
             <!-- AI 消息复用宿主成熟的 MarkdownView 组件渲染 markdown（含代码高亮、复制按钮等） -->
-            <component
-              :is="MarkdownView"
+            <MarkdownView
               v-if="msg.role === 'ai'"
               :content="msg.content"
               class="ai-markdown"
@@ -63,7 +62,6 @@
       <VCardActions class="ai-input-area pa-4">
         <VTextField
           v-model="inputText"
-          :disabled="loading"
           class="ai-input"
           density="compact"
           hide-details
@@ -72,8 +70,7 @@
           @keydown.enter="sendMessage"
         />
         <VBtn
-          :disabled="!inputText.trim() || loading"
-          :loading="loading"
+          :disabled="!inputText.trim()"
           color="primary"
           icon="mdi-send"
           size="40"
@@ -88,51 +85,67 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { ChatMessage } from '../model'
-import { chatStream } from '../api'
+import { MarkdownView } from 'sfc-common/components'
+import { aiChatService, AiChatSession } from '../AiChatService'
 
-/**
- * 复用宿主全局注册的 MarkdownView 组件渲染 AI 消息
- * 扩展运行时独立加载，无法直接 import markdown-it，通过 window.Components 获取宿主组件
- */
-const MarkdownView = window.Components.MarkdownView
 
 const open = ref(false)
 const inputText = ref('')
-const loading = ref(false)
 const messages = ref<ChatMessage[]>([])
 
-/** 发送消息并开始 SSE 流式接收 */
-function sendMessage() {
+let chatSession: AiChatSession | null = null
+async function ensureSession() {
+  if (chatSession) {
+    return chatSession
+  }
+  chatSession = await aiChatService.connect()
+  chatSession.onMessage(resp => {
+    const aiMsg = ensureAiMsg()
+    if (resp.type == 'TEXT') {
+      aiMsg.content += resp.data.content
+    } else if (resp.type == 'ERROR') {
+      aiMsg.content += `ERROR: ${resp.data.message}`
+    }
+  })
+  return chatSession
+}
+
+function ensureAiMsg() {
+  let aiMsg = messages.value.findLast(e => e.role == 'ai')
+  if (aiMsg) {
+    return aiMsg
+  }
+  aiMsg = { role: 'ai', content: '' }
+  messages.value.push(aiMsg)
+  return aiMsg
+}
+
+/** 发送消息并开始 WebSocket 流式接收 */
+let isStarted = false
+async function sendMessage() {
   const text = inputText.value.trim()
-  if (!text || loading.value) return
+  if (!text) return
 
   inputText.value = ''
-  loading.value = true
 
   // 添加用户消息
   messages.value.push({ role: 'user', content: text })
 
   // 添加空的 AI 消息占位
   messages.value.push({ role: 'ai', content: '' })
-  // 取回数组中的响应式代理引用，直接改原始对象不会触发视图更新
-  const aiMsg = messages.value[messages.value.length - 1]
 
-  chatStream(
-    text,
-    // onMessage：逐字追加
-    (char: string) => {
-      aiMsg.content += char
-    },
-    // onDone
-    () => {
-      loading.value = false
-    },
-    // onError
-    (err: any) => {
-      aiMsg.content += `\n\n**错误**: ${err.message || '未知错误'}`
-      loading.value = false
+  const s = await ensureSession()
+  if (!isStarted) {
+    s.start()
+    isStarted = true
+  }
+  s.send({
+    type: 'CHAT',
+    data: {
+      content: text,
+      modelId: '1'
     }
-  )
+  })
 }
 </script>
 
