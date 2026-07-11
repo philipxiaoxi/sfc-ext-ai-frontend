@@ -1,3 +1,4 @@
+import SfcUtils from 'sfc-common/utils/SfcUtils/index.js'
 import AiChatDialog from './components/AiChatDialog.vue'
 import LlmProviderManager from './components/LlmProviderManager.vue'
 
@@ -16,7 +17,7 @@ window.bootContext.addProcessor({
       document.body.appendChild(container)
 
       // dyncmount 内部通过 buildApp 创建 Vue 实例，已注册 vuetify/router
-      window.SfcUtils.dyncmount(AiChatDialog, {
+      SfcUtils.dyncmount(AiChatDialog, {
         wrapVApp: false,
         tempDOMHandler(dom) {
           // 去掉默认的全屏 fixed 覆盖样式，改为正常流布局

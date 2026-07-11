@@ -100,7 +100,7 @@
 import { ref, computed, onMounted } from 'vue'
 import type { ChatMessage, ProviderWithModelsVo } from '../model'
 import { MarkdownView } from 'sfc-common/components'
-import { aiChatService, AiChatSession } from '../AiChatService'
+import { aiChatService, AiChatSession } from '../core/AiChatService'
 import { QueryApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 

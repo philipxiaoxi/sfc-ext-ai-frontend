@@ -1,5 +1,5 @@
 import { WebSocketService } from 'sfc-common'
-import type { ChatRequest, LlmResponse } from './chat-protocol'
+import type { ChatRequest, LlmResponse } from './ChatProtocol'
 
 // ────────────────────────── 接口定义 ──────────────────────────
 
