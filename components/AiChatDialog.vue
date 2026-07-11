@@ -14,79 +14,104 @@
         v-model="drawerOpen"
         location="right"
         :width="480"
+        class="chat-drawer"
       >
-        <div class="d-flex justify-space-between pa-2">
-          <span class="text-title-large">AI 助手</span>
-          <VBtn
-            icon="mdi-close"
-            density="compact"
-            variant="text"
-            @click="drawerOpen = false"
-          />
-        </div>
-        <div class="px-4 pb-2">
-          <VSelect
-            v-model="selectedModelId"
-            :items="modelOptions"
-            item-title="label"
-            item-value="value"
-            density="compact"
-            variant="underlined"
-            placeholder="选择模型"
-            hide-details
-          />
-        </div>
-        <VDivider />
-        <div class="ai-messages pa-4 flex-grow-1 overflow-y-auto">
+        <div class="d-flex flex-column h-100">
           <div
-            v-for="(msg, i) in messages"
-            :key="i"
-            :class="['d-flex ga-2 mb-3', msg.role === 'user' ? 'flex-row-reverse' : '']"
+            class="d-flex align-center pa-3 ga-2 chat-header-collapse"
+            @click="drawerOpen = false"
           >
-            <div class="message-avatar flex-shrink-0">
-              <VIcon
-                :icon="msg.role === 'ai' ? 'mdi-robot' : 'mdi-account'"
-                :color="msg.role === 'ai' ? 'primary' : 'grey'"
-              />
+            <div class="d-flex align-center ga-2">
+              <VIcon icon="mdi-robot" color="primary" size="24" />
+              <span class="text-subtitle-1 font-weight-bold">AI 助手</span>
+            </div>
+            <VSpacer />
+            <VBtn
+              icon="mdi-chevron-right"
+              density="comfortable"
+              variant="text"
+              size="small"
+              title="收起"
+            />
+          </div>
+          <div class="px-3 pb-2 pt-1">
+            <VSelect
+              v-model="selectedModelId"
+              :items="modelOptions"
+              item-title="label"
+              item-value="value"
+              density="compact"
+              variant="underlined"
+              placeholder="选择模型"
+              hide-details
+            />
+          </div>
+          <VDivider />
+          <div class="ai-messages flex-grow-1 overflow-y-auto px-4 py-4 d-flex flex-column">
+            <div
+              v-if="messages.length === 0"
+              class="flex-grow-1 d-flex flex-column align-center justify-center text-medium-emphasis"
+            >
+              <VIcon icon="mdi-robot-outline" size="48" class="mb-3" />
+              <span class="text-body-2">有什么可以帮助你的吗？</span>
             </div>
             <div
-              :class="[
-                'message-bubble px-3 py-2',
-                msg.role === 'user'
-                  ? 'bg-primary text-on-primary rounded-lg rounded-be-0'
-                  : 'bg-surface-variant text-on-surface-variant rounded-lg rounded-bs-0 overflow-hidden'
-              ]"
+              v-for="(msg, i) in messages"
+              :key="i"
+              :class="['d-flex ga-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : '']"
             >
-              <MarkdownView
-                v-if="msg.role === 'ai'"
-                :content="msg.content"
-                class="ai-markdown"
-              />
-              <template v-else>
-                {{ msg.content }}
-              </template>
+              <div class="message-avatar flex-shrink-0">
+                <VAvatar
+                  :color="msg.role === 'ai' ? 'primary' : 'grey-lighten-1'"
+                  size="32"
+                  variant="tonal"
+                >
+                  <VIcon
+                    :icon="msg.role === 'ai' ? 'mdi-robot' : 'mdi-account'"
+                    size="18"
+                  />
+                </VAvatar>
+              </div>
+              <div
+                :class="[
+                  'message-bubble px-4 py-2',
+                  msg.role === 'user'
+                    ? 'bg-primary text-on-primary rounded-lg rounded-br-0'
+                    : 'bg-surface text-on-surface rounded-lg rounded-bl-0'
+                ]"
+              >
+                <MarkdownView
+                  v-if="msg.role === 'ai'"
+                  :content="msg.content"
+                  class="ai-markdown"
+                />
+                <template v-else>
+                  {{ msg.content }}
+                </template>
+              </div>
             </div>
           </div>
-        </div>
-        <VDivider />
-        <div class="pa-4">
-          <div class="d-flex ga-2">
-            <VTextField
-              v-model="inputText"
-              density="compact"
-              hide-details
-              placeholder="输入消息..."
-              variant="outlined"
-              @keydown.enter="sendMessage"
-            />
-            <VBtn
-              :disabled="!inputText.trim() || selectedModelId == null"
-              color="primary"
-              icon="mdi-send"
-              size="40"
-              variant="flat"
-              @click="sendMessage"
-            />
+          <VDivider />
+          <div class="pa-3">
+            <div class="d-flex ga-2 align-end">
+              <VTextField
+                v-model="inputText"
+                density="comfortable"
+                hide-details
+                placeholder="输入消息..."
+                variant="outlined"
+                class="flex-grow-1"
+                @keydown.enter="sendMessage"
+              />
+              <VBtn
+                :disabled="!inputText.trim() || selectedModelId == null"
+                color="primary"
+                icon="mdi-send"
+                size="40"
+                variant="flat"
+                @click="sendMessage"
+              />
+            </div>
           </div>
         </div>
       </v-navigation-drawer>
@@ -218,6 +243,20 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.chat-drawer {
+  top: 56px !important;
+  height: calc(100% - 56px) !important;
+}
+
+.chat-header-collapse {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.chat-header-collapse:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
 .ai-fab {
   position: fixed;
   bottom: 24px;
@@ -231,11 +270,8 @@ export default defineComponent({
 }
 
 .message-avatar {
-  width: 32px;
-  height: 32px;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
 }
 
 .message-bubble {
@@ -243,10 +279,15 @@ export default defineComponent({
   font-size: 14px;
   line-height: 1.6;
   word-break: break-word;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.ai-messages {
+  scroll-behavior: smooth;
 }
 
 .ai-markdown :deep(.markdown) {
-  padding: 8px 12px;
+  padding: 4px 0;
   font-size: 14px;
 }
 
