@@ -22,6 +22,8 @@ export type UserMessageType = 'START_SESSION' | 'CHAT' | 'TOOL_ACK' | 'STOP'
 export type LlmMessageType =
   | 'SESSION_ACK'
   | 'TOOL_CALL'
+  | 'TOOL_CALL_START'
+  | 'TOOL_CALL_END'
   | 'TOOL_CALL_REQ'
   | 'THINKING_START'
   | 'THINKING_END'
@@ -73,7 +75,7 @@ export interface DonePayload {
   reason: string
 }
 
-/** Tool Call 告知消息 payload  */
+/** Tool Call 告知消息 payload（已废弃，由 TOOL_CALL_START + TOOL_CALL_END 替代） */
 export interface ToolCallPayload {
   /** 工具名称 */
   name: string
@@ -82,6 +84,30 @@ export interface ToolCallPayload {
   arguments: string
 
   /** 工具调用结果 */
+  result: string
+}
+
+/** TOOL_CALL_START 消息 payload */
+export interface ToolCallStartPayload {
+  /** 工具调用唯一 id，用于关联 TOOL_CALL_START 与 TOOL_CALL_END */
+  id: string
+
+  /** 工具名称 */
+  name: string
+
+  /** 工具参数（JSON 格式字符串） */
+  arguments: string
+}
+
+/** TOOL_CALL_END 消息 payload */
+export interface ToolCallEndPayload {
+  /** 工具调用唯一 id，与 TOOL_CALL_START 的 id 对应 */
+  id: string
+
+  /** 工具名称 */
+  name: string
+
+  /** 工具执行结果 */
   result: string
 }
 
@@ -123,6 +149,8 @@ export type LlmResponse =
   | { type: 'THINKING_START' }
   | { type: 'THINKING_END' }
   | { type: 'TOOL_CALL'; data: ToolCallPayload }
+  | { type: 'TOOL_CALL_START'; data: ToolCallStartPayload }
+  | { type: 'TOOL_CALL_END'; data: ToolCallEndPayload }
   | { type: 'TOOL_CALL_REQ' }
   | { type: 'DONE'; data: DonePayload }
   | { type: 'ERROR'; data: ErrorPayload }

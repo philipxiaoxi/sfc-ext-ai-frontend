@@ -62,13 +62,28 @@
               </div>
               
               <!-- 工具调用消息 -->
-              <template v-if="msg.role === 'tool'">
-                <div class="d-flex align-center tip ml-12">
-                  <VIcon icon="mdi-wrench-outline" class="mr-2" size="14" />
-                  <span>{{ msg.name }}</span>
+              <div v-if="msg.role === 'tool'" class="ml-12">
+                <div class="d-flex align-center tip toggle-args" @click="toggleArgs(i)">
+                  <VIcon
+                    :icon="expandedArgs[i] ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                    size="14"
+                    class="mr-1"
+                  />
+                  <VIcon icon="mdi-wrench-outline" class="mr-1" size="14" />
+                  <span class="mr-1">{{ msg.name }}</span>
+                  <VIcon
+                    v-if="msg.status === 'pending'"
+                    icon="mdi-loading mdi-spin"
+                    color="primary"
+                    class="mr-2"
+                    size="14"
+                  />
                   <span v-if="msg.result !== undefined" class="ml-1">✓</span>
                 </div>
-              </template>
+                <div v-show="expandedArgs[i]" class="mt-1">
+                  <pre class="tool-args-pre tip pa-2 ma-0">IN: {{ msg.arguments }} <br>OUT: {{ msg.result }}</pre>
+                </div>
+              </div>
 
               <!-- AI助手 或 用户对话内容消息 -->
               <div
@@ -179,7 +194,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive } from 'vue'
-import type { ChatMessage, ProviderWithModelsVo } from '../model'
+import type { ChatMessage, ToolMessage, ProviderWithModelsVo } from '../model'
 import { MarkdownView } from 'sfc-common/components'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
 import { QueryApi } from '../api'
@@ -191,9 +206,14 @@ const messages = ref<ChatMessage[]>([])
 const providersWithModels = ref<ProviderWithModelsVo[]>([])
 const selectedModelId = ref<number | null>(null)
 const expandedThinking = ref(reactive({} as Record<number, boolean>))
+const expandedArgs = ref(reactive({} as Record<number, boolean>))
 
 function toggleThinking(index: number) {
   expandedThinking.value[index] = !expandedThinking.value[index]
+}
+
+function toggleArgs(index: number) {
+  expandedArgs.value[index] = !expandedArgs.value[index]
 }
 
 const modelOptions = computed(() => {
@@ -251,9 +271,21 @@ async function ensureSession() {
       if (!hasThinking) {
         messages.value.push({ role: 'ai', content: '', reasoningContent: '' })
       }
-    } else if (resp.type == 'TOOL_CALL') {
+    } else if (resp.type == 'TOOL_CALL_START') {
       const payload = resp.data
-      messages.value.push({ role: 'tool', ...payload  })
+      messages.value.push({ role: 'tool', id: payload.id, name: payload.name, arguments: payload.arguments, status: 'pending' })
+    } else if (resp.type == 'TOOL_CALL_END') {
+      const payload = resp.data
+      const idx = messages.value.findIndex(m => m.role === 'tool' && m.id === payload.id)
+      if (idx >= 0) {
+        const msg = messages.value[idx] as ToolMessage
+        msg.result = payload.result
+        msg.status = 'done'
+      }
+    } else if (resp.type == 'TOOL_CALL') {
+      // 旧协议兼容（已废弃）
+      const payload = resp.data
+      messages.value.push({ role: 'tool', id: '', name: payload.name, arguments: payload.arguments, result: payload.result, status: 'done' })
     } else if (resp.type == 'ERROR') {
       SfcUtils.snackbar(resp.data.message)
     } else if (resp.type == 'SESSION_ACK') {
@@ -422,5 +454,32 @@ export default defineComponent({
 
 .thinking-markdown :deep(.markdown-code) {
   margin: 4px 0;
+}
+
+.toggle-args {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.toggle-args:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.args-preview {
+  max-width: 200px;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.tool-args-pre {
+  background-color: rgba(var(--v-theme-on-surface), 0.04);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 10px;
 }
 </style>

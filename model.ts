@@ -5,14 +5,20 @@ export type ChatMessage = ToolMessage | TextMessage
 export type ToolMessage = {
   role: 'tool',
 
+  /** 工具调用唯一 id，用于关联 TOOL_CALL_START 与 TOOL_CALL_END */
+  id: string
+
   /** 工具名称 */
   name: string
 
   /** 调用参数 */
   arguments: string
 
-  /** 调用结果 */
-  result: string
+  /** 调用结果（TOOL_CALL_START 时不存在，TOOL_CALL_END 时设置） */
+  result?: string
+
+  /** 工具调用状态：pending 进行中，done 已完成 */
+  status: 'pending' | 'done'
 }
 
 /** 对话消息 */
