@@ -1,5 +1,23 @@
 import { CommonRequest } from 'sfc-common/model'
-import type { LlmModel, LlmProvider, ProviderWithModelsVo } from './model'
+import type { AdapterInfo, LlmModel, LlmProvider, ProviderWithModelsVo } from './model'
+
+// ────────────────────────── LLM 适配器 API ──────────────────────────
+
+/** 适配器 API 前缀 */
+const adapterPrefix = '/ai/adapter'
+
+/** LLM 适配器相关 API */
+export namespace AdapterApi {
+  /**
+   * 获取系统当前支持的所有 LLM 提供商适配器列表
+   */
+  export function getList(): CommonRequest<AdapterInfo[]> {
+    return {
+      url: `${adapterPrefix}/list`,
+      method: 'get'
+    }
+  }
+}
 
 // ────────────────────────── LLM 提供商 API ──────────────────────────
 

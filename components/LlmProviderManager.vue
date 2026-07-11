@@ -38,7 +38,13 @@
                 class="ml-2"
                 color="primary"
               >
-                {{ provider.protocolType }}
+                <template v-if="getAdapterInfo(provider.adapter)">
+                  <CommonIcon :icon="getAdapterInfo(provider.adapter)!.icon" size="16" class="mr-1" />
+                  {{ getAdapterInfo(provider.adapter)!.name }}
+                </template>
+                <template v-else>
+                  {{ provider.adapter }}
+                </template>
               </v-chip>
             </v-list-item-title>
             <v-list-item-subtitle class="text-caption mt-1">
@@ -84,8 +90,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { LlmProvider } from '../model'
-import { ProviderApi } from '../api'
+import type { AdapterInfo, LlmProvider } from '../model'
+import { AdapterApi, ProviderApi } from '../api'
 import LlmProviderFormVue from './LlmProviderForm.vue'
 
 const props = defineProps({
@@ -98,6 +104,29 @@ const props = defineProps({
 
 const loading = ref(false)
 const providers = ref<LlmProvider[]>([])
+
+/** 适配器列表 */
+const adapterOptions = ref<AdapterInfo[]>([])
+
+/**
+ * 根据适配器 ID 查找对应的适配器信息
+ * @param id 适配器 ID
+ */
+function getAdapterInfo(id: string): AdapterInfo | undefined {
+  return adapterOptions.value.find(a => a.id === id)
+}
+
+/**
+ * 加载适配器列表
+ */
+async function loadAdapters() {
+  try {
+    const res = await window.SfcUtils.request(AdapterApi.getList())
+    adapterOptions.value = res.data.data
+  } catch {
+    adapterOptions.value = []
+  }
+}
 
 /**
  * 加载提供商列表
@@ -156,6 +185,7 @@ async function deleteProvider(provider: LlmProvider) {
 }
 
 onMounted(() => {
+  loadAdapters()
   loadProviders()
 })
 </script>

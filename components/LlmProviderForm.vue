@@ -18,11 +18,28 @@
     <v-row>
       <v-col cols="12">
         <v-select
-          v-model="formData.protocolType"
-          label="协议类型"
-          :items="protocolTypeOptions"
-          :rules="validators.protocolType"
-        />
+          v-model="formData.adapter"
+          label="适配器"
+          :items="adapterOptions"
+          item-title="name"
+          item-value="id"
+          :rules="validators.adapter"
+          :loading="adapterLoading"
+        >
+          <template #item="{ props: itemProps, item }">
+            <v-list-item v-bind="itemProps" :title="item.name">
+              <template #prepend>
+                <CommonIcon :icon="item.icon" size="20" class="mr-2 d-flex" />
+              </template>
+            </v-list-item>
+          </template>
+          <template #selection="{ item }">
+            <div class="d-flex align-center">
+              <CommonIcon :icon="item.icon" size="20" class="mr-2" />
+              <span>{{ item.name }}</span>
+            </div>
+          </template>
+        </v-select>
       </v-col>
     </v-row>
     <v-row>
@@ -135,9 +152,8 @@
 <script setup lang="ts">
 import { CommonForm, defineForm } from 'sfc-common'
 import { Validators } from 'sfc-common'
-import type { SelectOption } from 'sfc-common/model'
-import type { LlmModel, LlmProvider } from '../model'
-import { ProviderApi, ModelApi } from '../api'
+import type { AdapterInfo, LlmModel, LlmProvider } from '../model'
+import { AdapterApi, ProviderApi, ModelApi } from '../api'
 import LlmModelFormVue from './LlmModelForm.vue'
 
 const formRef = ref() as Ref<CommonForm>
@@ -159,11 +175,26 @@ const emits = defineEmits<{
   (e: 'submit'): void
 }>()
 
-/** 协议类型选项 */
-const protocolTypeOptions: SelectOption[] = [
-  { title: 'OpenAI', value: 'OpenAI' },
-  { title: 'Anthropic', value: 'Anthropic' }
-]
+/** 适配器选项列表（从 /api/ai/adapter/list 加载） */
+const adapterOptions = ref<AdapterInfo[]>([])
+
+/** 适配器列表加载中 */
+const adapterLoading = ref(false)
+
+/**
+ * 加载适配器列表
+ */
+async function loadAdapters() {
+  adapterLoading.value = true
+  try {
+    const res = await window.SfcUtils.request(AdapterApi.getList())
+    adapterOptions.value = res.data.data
+  } catch {
+    adapterOptions.value = []
+  } finally {
+    adapterLoading.value = false
+  }
+}
 
 /** 当前已添加的模型列表（未持久化，随提供商一起保存） */
 const models = ref<LlmModel[]>([])
@@ -283,7 +314,7 @@ const formInst = defineForm({
   },
   formData: {
     name: '',
-    protocolType: 'OpenAI' as const,
+    adapter: '',
     baseUrl: '',
     apiKey: '',
     modelListUrl: '',
@@ -295,8 +326,8 @@ const formInst = defineForm({
     name: [
       Validators.notNull('提供商名称不能为空')
     ],
-    protocolType: [
-      Validators.notNull('请选择协议类型')
+    adapter: [
+      Validators.notNull('请选择适配器')
     ],
     baseUrl: [
       Validators.notNull('请求地址不能为空')
@@ -309,6 +340,9 @@ const formInst = defineForm({
 })
 
 const { formData, actions, validators, loadingRef, loadingManager } = formInst
+
+// 加载适配器列表
+loadAdapters()
 
 // 编辑模式：回填初始值
 if (props.initValue) {

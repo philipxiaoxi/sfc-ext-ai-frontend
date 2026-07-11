@@ -11,8 +11,15 @@ export interface ChatRequest {
   message: string
 }
 
-/** LLM 提供商协议类型 */
-export type ProtocolType = 'OpenAI' | 'Anthropic'
+/** LLM 适配器信息 */
+export interface AdapterInfo {
+  /** 适配器标识 */
+  id: string
+  /** 显示名称 */
+  name: string
+  /** 图标标识（Material Icon / URL / base64） */
+  icon: string
+}
 
 /** LLM 提供商 */
 export interface LlmProvider {
@@ -22,8 +29,8 @@ export interface LlmProvider {
   uid?: number
   /** 提供商名称 */
   name: string
-  /** 协议类型 */
-  protocolType: ProtocolType
+  /** 适配器标识 */
+  adapter: string
   /** 请求地址 */
   baseUrl: string
   /** API 密钥 */
@@ -44,8 +51,8 @@ export interface ProviderVo {
   id: number
   /** 提供商名称 */
   name: string
-  /** 协议类型 */
-  protocolType: ProtocolType
+  /** 适配器标识 */
+  adapter: string
 }
 
 /** 提供商及其关联模型列表 */
