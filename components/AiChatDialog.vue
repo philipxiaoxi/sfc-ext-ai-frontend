@@ -49,13 +49,19 @@
             >
               <!-- 显示 AI助手 或 用户 的聊天头像 -->
               <div v-if="msg.role != 'tool'" class="message-avatar flex-shrink-0">
+                <UserAvatar
+                  v-if="msg.role == 'user'"
+                  :size="32"
+                  :uid="uid"
+                />
                 <VAvatar
-                  :color="msg.role === 'ai' ? 'primary' : 'grey-lighten-1'"
+                  v-else
                   size="32"
                   variant="tonal"
                 >
                   <VIcon
-                    :icon="msg.role === 'ai' ? 'mdi-robot' : 'mdi-account'"
+                    color="'primary'"
+                    icon="mdi-robot"
                     size="18"
                   />
                 </VAvatar>
@@ -195,7 +201,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive } from 'vue'
 import type { ChatMessage, ToolMessage, ProviderWithModelsVo } from '../model'
-import { MarkdownView } from 'sfc-common/components'
+import { MarkdownView, UserAvatar } from 'sfc-common/components'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
 import { QueryApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
@@ -228,6 +234,8 @@ const modelOptions = computed(() => {
   }
   return options
 })
+
+const uid = computed(() => getContext().session.value.user.id)
 
 onMounted(() => {
   loadModels()
@@ -359,6 +367,7 @@ async function sendMessage() {
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import { getContext } from 'sfc-common'
 
 export default defineComponent({
   name: 'AiChatDialog'
