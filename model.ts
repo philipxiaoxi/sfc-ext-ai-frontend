@@ -1,5 +1,22 @@
 /** 聊天消息 */
-export interface ChatMessage {
+export type ChatMessage = ToolMessage | TextMessage
+
+/** 工具消息 */
+export type ToolMessage = {
+  role: 'tool',
+
+  /** 工具名称 */
+  name: string
+
+  /** 调用参数 */
+  arguments: string
+
+  /** 调用结果 */
+  result: string
+}
+
+/** 对话消息 */
+export type TextMessage = {
   /** 角色：'user' | 'ai' */
   role: 'user' | 'ai'
   /** 消息内容（AI 消息为累积的 markdown 文本） */

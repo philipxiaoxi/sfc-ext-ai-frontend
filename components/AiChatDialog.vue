@@ -47,7 +47,8 @@
               :key="i"
               :class="['d-flex ga-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : '']"
             >
-              <div class="message-avatar flex-shrink-0">
+              <!-- 显示 AI助手 或 用户 的聊天头像 -->
+              <div v-if="msg.role != 'tool'" class="message-avatar flex-shrink-0">
                 <VAvatar
                   :color="msg.role === 'ai' ? 'primary' : 'grey-lighten-1'"
                   size="32"
@@ -59,7 +60,19 @@
                   />
                 </VAvatar>
               </div>
+              
+              <!-- 工具调用消息 -->
+              <template v-if="msg.role === 'tool'">
+                <div class="d-flex align-center tip ml-12">
+                  <VIcon icon="mdi-wrench-outline" class="mr-2" size="14" />
+                  <span>{{ msg.name }}</span>
+                  <span v-if="msg.result !== undefined" class="ml-1">✓</span>
+                </div>
+              </template>
+
+              <!-- AI助手 或 用户对话内容消息 -->
               <div
+                v-if="msg.role != 'tool'"
                 :class="[
                   'message-bubble px-4 py-2',
                   msg.role === 'user'
@@ -68,6 +81,7 @@
                 ]"
               >
                 <template v-if="msg.role === 'ai'">
+                  <!-- 思维链 -->
                   <div
                     v-if="msg.reasoningContent !== undefined"
                   >
@@ -91,11 +105,12 @@
                     </div>
                   </div>
                   <MarkdownView
+                    v-if="msg.content"
                     :content="msg.content"
                     class="ai-markdown"
                   />
                 </template>
-                <template v-else>
+                <template v-else-if="msg.role == 'user'">
                   {{ msg.content }}
                 </template>
               </div>
@@ -236,6 +251,9 @@ async function ensureSession() {
       if (!hasThinking) {
         messages.value.push({ role: 'ai', content: '', reasoningContent: '' })
       }
+    } else if (resp.type == 'TOOL_CALL') {
+      const payload = resp.data
+      messages.value.push({ role: 'tool', ...payload  })
     } else if (resp.type == 'ERROR') {
       SfcUtils.snackbar(resp.data.message)
     } else if (resp.type == 'SESSION_ACK') {

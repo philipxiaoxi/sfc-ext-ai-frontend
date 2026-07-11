@@ -73,6 +73,19 @@ export interface DonePayload {
   reason: string
 }
 
+/** Tool Call 告知消息 payload  */
+export interface ToolCallPayload {
+  /** 工具名称 */
+  name: string
+
+  /** 参数 json 格式，反序列化后为 Record<string, any> */
+  arguments: string
+
+  /** 工具调用结果 */
+  result: string
+}
+
+
 // ────────────────────────── 请求消息（客户端 → 服务端） ──────────────────────────
 
 /**
@@ -109,7 +122,7 @@ export type LlmResponse =
   | { type: 'TEXT'; data: TextPayload }
   | { type: 'THINKING_START' }
   | { type: 'THINKING_END' }
-  | { type: 'TOOL_CALL' }
+  | { type: 'TOOL_CALL'; data: ToolCallPayload }
   | { type: 'TOOL_CALL_REQ' }
   | { type: 'DONE'; data: DonePayload }
   | { type: 'ERROR'; data: ErrorPayload }
