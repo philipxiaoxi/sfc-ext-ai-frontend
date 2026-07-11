@@ -88,11 +88,12 @@
                 placeholder="输入消息..."
                 variant="outlined"
                 class="flex-grow-1"
-                @keydown.enter="sendMessage"
+                @keydown.enter="onInputEnter"
               />
               <VMenu
                 location="top end"
                 offset="8"
+                :close-on-content-click="false"
               >
                 <template #activator="{ props }">
                   <VBtn
@@ -228,6 +229,12 @@ onUnmounted(() => {
 })
 
 let isStarted = false
+
+function onInputEnter(e: KeyboardEvent) {
+  if (e.isComposing) return
+  sendMessage()
+}
+
 async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || selectedModelId.value == null) return
