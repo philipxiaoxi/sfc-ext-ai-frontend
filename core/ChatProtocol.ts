@@ -73,6 +73,10 @@ export interface ErrorPayload {
 export interface DonePayload {
   /** 停止原因 */
   reason: string
+  /** 模型 ID（模型标识字符串，如 `deepseek-v4-flash`） */
+  modelId?: IdType
+  /** 调用耗时（毫秒） */
+  time?: number
 }
 
 /** Tool Call 告知消息 payload（已废弃，由 TOOL_CALL_START + TOOL_CALL_END 替代） */

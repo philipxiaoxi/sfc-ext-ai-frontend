@@ -1,5 +1,7 @@
+import type { IdType } from 'sfc-common/model'
+
 /** 聊天消息 */
-export type ChatMessage = ToolMessage | TextMessage
+export type ChatMessage = ToolMessage | TextMessage | DoneInfo
 
 /** 工具消息 */
 export type ToolMessage = {
@@ -29,6 +31,15 @@ export type TextMessage = {
   content: string
   /** 思维链内容（LLM 思考期间输出，作为独立消息展示，与 content 互斥） */
   reasoningContent?: string
+}
+
+/** DONE 完成信息 */
+export type DoneInfo = {
+  role: 'done'
+  /** 模型 ID（模型标识字符串，如 `deepseek-v4-flash`） */
+  modelId: IdType
+  /** 调用耗时（毫秒） */
+  time: number
 }
 
 /** 聊天请求体 */

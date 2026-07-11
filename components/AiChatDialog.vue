@@ -42,13 +42,15 @@
               <VIcon icon="mdi-robot-outline" size="48" class="mb-3" />
               <span class="text-body-2">有什么可以帮助你的吗？</span>
             </div>
+
+            <!-- 对话消息列表 -->
             <div
               v-for="(msg, i) in messages"
               :key="i"
               :class="['d-flex ga-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : '']"
             >
               <!-- 显示 AI助手 或 用户 的聊天头像 -->
-              <div v-if="msg.role != 'tool'" class="message-avatar flex-shrink-0">
+              <div v-if="msg.role !== 'tool' && msg.role !== 'done'" class="message-avatar flex-shrink-0">
                 <UserAvatar
                   v-if="msg.role == 'user'"
                   :size="32"
@@ -60,7 +62,7 @@
                   variant="tonal"
                 >
                   <VIcon
-                    color="'primary'"
+                    color="primary"
                     icon="mdi-robot"
                     size="18"
                   />
@@ -91,9 +93,14 @@
                 </div>
               </div>
 
+              <!-- DONE 信息 -->
+              <div v-else-if="msg.role === 'done'" class="d-flex justify-center ml-12">
+                <span class="tip" style="font-size: 12px;">{{ msg.modelId }} · {{ formatElapsedTime(msg.time) }}</span>
+              </div>
+
               <!-- AI助手 或 用户对话内容消息 -->
               <div
-                v-if="msg.role != 'tool'"
+                v-if="msg.role !== 'tool' && msg.role !== 'done'"
                 :class="[
                   'message-bubble px-4 py-2',
                   msg.role === 'user'
@@ -107,7 +114,7 @@
                     v-if="msg.reasoningContent !== undefined"
                   >
                     <div
-                      class="d-flex align-center ga-1 thinking-toggle"
+                      class="d-flex align-center ga-1 thinking-toggle thinking-bubble"
                       @click="toggleThinking(i)"
                     >
                       <VIcon
@@ -222,6 +229,27 @@ function toggleArgs(index: number) {
   expandedArgs.value[index] = !expandedArgs.value[index]
 }
 
+/**
+ * 格式化调用耗时（毫秒）为可读字符串。
+ *
+ * - `< 60s` → `14.5s`（保留一位小数）
+ * - `>= 60s` 且 `< 1h` → `32m12s`（分钟+整数秒）
+ * - `>= 1h` → `1h6m`（小时+分钟）
+ */
+function formatElapsedTime(ms: number): string {
+  const totalSec = ms / 1000
+  if (totalSec < 60) {
+    return `${parseFloat(totalSec.toFixed(1))}s`
+  }
+  const hours = Math.floor(totalSec / 3600)
+  const mins = Math.floor((totalSec % 3600) / 60)
+  const secs = Math.floor(totalSec % 60)
+  if (hours > 0) {
+    return `${hours}h${mins}m`
+  }
+  return `${mins}m${secs}s`
+}
+
 const modelOptions = computed(() => {
   const options: { label: string; value: number }[] = []
   for (const pm of providersWithModels.value) {
@@ -290,12 +318,13 @@ async function ensureSession() {
         msg.result = payload.result
         msg.status = 'done'
       }
-    } else if (resp.type == 'TOOL_CALL') {
-      // 旧协议兼容（已废弃）
-      const payload = resp.data
-      messages.value.push({ role: 'tool', id: '', name: payload.name, arguments: payload.arguments, result: payload.result, status: 'done' })
     } else if (resp.type == 'ERROR') {
       SfcUtils.snackbar(resp.data.message)
+    } else if (resp.type == 'DONE') {
+      const { modelId, time } = resp.data
+      if (modelId != null && time != null) {
+        messages.value.push({ role: 'done', modelId, time })
+      }
     } else if (resp.type == 'SESSION_ACK') {
       chatSessionId = resp.data.sessionId
     }
@@ -414,6 +443,10 @@ export default defineComponent({
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.message-bubble + .message-bubble {
+  margin-bottom: 12px;
+}
+
 .ai-messages {
   scroll-behavior: smooth;
 }
@@ -443,7 +476,6 @@ export default defineComponent({
 .thinking-toggle {
   cursor: pointer;
   user-select: none;
-  border-radius: 4px;
   transition: background-color 0.15s ease;
 }
 
