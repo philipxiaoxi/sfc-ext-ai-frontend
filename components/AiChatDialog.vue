@@ -1,111 +1,108 @@
 <template>
-  <div class="ai-assistant-wrapper">
-    <!-- 浮动按钮 -->
+  <div class="ai-chat-dialog">
     <VBtn
       class="ai-fab"
       color="primary"
       elevation="8"
-      icon="mdi-robot"
+      icon="mdi-robot-outline"
       size="56"
-      @click="open = !open"
+      @click="drawerOpen = !drawerOpen"
     />
 
-    <!-- 对话框面板 -->
-    <VCard v-show="open" class="ai-dialog">
-      <VCardTitle class="ai-dialog-header d-flex align-center pa-4">
-        <VIcon start icon="mdi-robot" />
-        <span class="text-h6">AI 助手</span>
-        <VSpacer />
-        <VBtn
-          icon="mdi-close"
-          variant="text"
-          size="small"
-          @click="open = false"
-        />
-      </VCardTitle>
-
-      <!-- 模型选择 -->
-      <div class="px-4 pb-2">
-        <VSelect
-          v-model="selectedModelId"
-          :items="modelOptions"
-          item-title="label"
-          item-value="value"
-          density="compact"
-          variant="plain"
-          placeholder="选择模型"
-          hide-details
-        />
-      </div>
-
-      <VDivider />
-
-      <!-- 消息列表 -->
-      <VCardText class="ai-messages pa-4">
-        <div
-          v-for="(msg, i) in messages"
-          :key="i"
-          :class="['message-row', msg.role === 'user' ? 'message-user' : 'message-ai']"
-        >
-          <div v-if="msg.role === 'ai'" class="message-avatar">
-            <VIcon color="primary" icon="mdi-robot" />
-          </div>
-          <div v-else class="message-avatar">
-            <VIcon color="grey" icon="mdi-account" />
-          </div>
+    <Teleport to="main">
+      <v-navigation-drawer
+        v-model="drawerOpen"
+        location="right"
+        :width="480"
+      >
+        <div class="d-flex justify-space-between pa-2">
+          <span class="text-title-large">AI 助手</span>
+          <VBtn
+            icon="mdi-close"
+            density="compact"
+            variant="text"
+            @click="drawerOpen = false"
+          />
+        </div>
+        <div class="px-4 pb-2">
+          <VSelect
+            v-model="selectedModelId"
+            :items="modelOptions"
+            item-title="label"
+            item-value="value"
+            density="compact"
+            variant="underlined"
+            placeholder="选择模型"
+            hide-details
+          />
+        </div>
+        <VDivider />
+        <div class="ai-messages pa-4 flex-grow-1 overflow-y-auto">
           <div
-            :class="['message-bubble', msg.role === 'user' ? 'bubble-user' : 'bubble-ai']"
+            v-for="(msg, i) in messages"
+            :key="i"
+            :class="['d-flex ga-2 mb-3', msg.role === 'user' ? 'flex-row-reverse' : '']"
           >
-            <!-- AI 消息复用宿主成熟的 MarkdownView 组件渲染 markdown（含代码高亮、复制按钮等） -->
-            <MarkdownView
-              v-if="msg.role === 'ai'"
-              :content="msg.content"
-              class="ai-markdown"
-            />
-            <!-- 用户消息按纯文本展示，Vue 模板插值自带转义，避免 XSS -->
-            <template v-else>
-              {{ msg.content }}
-            </template>
+            <div class="message-avatar flex-shrink-0">
+              <VIcon
+                :icon="msg.role === 'ai' ? 'mdi-robot' : 'mdi-account'"
+                :color="msg.role === 'ai' ? 'primary' : 'grey'"
+              />
+            </div>
+            <div
+              :class="[
+                'message-bubble px-3 py-2',
+                msg.role === 'user'
+                  ? 'bg-primary text-on-primary rounded-lg rounded-be-0'
+                  : 'bg-surface-variant text-on-surface-variant rounded-lg rounded-bs-0 overflow-hidden'
+              ]"
+            >
+              <MarkdownView
+                v-if="msg.role === 'ai'"
+                :content="msg.content"
+                class="ai-markdown"
+              />
+              <template v-else>
+                {{ msg.content }}
+              </template>
+            </div>
           </div>
         </div>
-      </VCardText>
-
-      <VDivider />
-
-      <!-- 输入区域 -->
-      <VCardActions class="ai-input-area pa-4">
-        <VTextField
-          v-model="inputText"
-          class="ai-input"
-          density="compact"
-          hide-details
-          placeholder="输入消息..."
-          variant="outlined"
-          @keydown.enter="sendMessage"
-        />
-        <VBtn
-          :disabled="!inputText.trim() || selectedModelId == null"
-          color="primary"
-          icon="mdi-send"
-          size="40"
-          variant="flat"
-          @click="sendMessage"
-        />
-      </VCardActions>
-    </VCard>
+        <VDivider />
+        <div class="pa-4">
+          <div class="d-flex ga-2">
+            <VTextField
+              v-model="inputText"
+              density="compact"
+              hide-details
+              placeholder="输入消息..."
+              variant="outlined"
+              @keydown.enter="sendMessage"
+            />
+            <VBtn
+              :disabled="!inputText.trim() || selectedModelId == null"
+              color="primary"
+              icon="mdi-send"
+              size="40"
+              variant="flat"
+              @click="sendMessage"
+            />
+          </div>
+        </div>
+      </v-navigation-drawer>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, Teleport } from 'vue'
 import type { ChatMessage, ProviderWithModelsVo } from '../model'
 import { MarkdownView } from 'sfc-common/components'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
 import { QueryApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 
-
-const open = ref(false)
+const drawerOpen = ref(false)
 const inputText = ref('')
 const messages = ref<ChatMessage[]>([])
 const providersWithModels = ref<ProviderWithModelsVo[]>([])
@@ -175,7 +172,17 @@ function ensureAiMsg() {
   return aiMsg
 }
 
-/** 发送消息并开始 WebSocket 流式接收 */
+watch(drawerOpen, (open) => {
+  const el = document.querySelector('main')
+  if (el) {
+    el.style.setProperty('padding-right', open ? '480px' : '')
+  }
+})
+
+onUnmounted(() => {
+  document.querySelector('main')?.style.removeProperty('padding-right')
+})
+
 let isStarted = false
 async function sendMessage() {
   const text = inputText.value.trim()
@@ -183,10 +190,8 @@ async function sendMessage() {
 
   inputText.value = ''
 
-  // 添加用户消息
   messages.value.push({ role: 'user', content: text })
 
-  // 添加空的 AI 消息占位
   messages.value.push({ role: 'ai', content: '' })
 
   const s = await ensureSession()
@@ -204,75 +209,28 @@ async function sendMessage() {
 }
 </script>
 
+<script lang="ts">
+import { defineComponent } from 'vue'
+
+export default defineComponent({
+  name: 'AiChatDialog'
+})
+</script>
+
 <style scoped>
-.ai-assistant-wrapper {
+.ai-fab {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.ai-fab {
-  transition: transform 0.2s ease;
   z-index: 10000;
+  transition: transform 0.2s ease;
 }
 
 .ai-fab:hover {
   transform: scale(1.08);
 }
 
-.ai-dialog {
-  /* 没有 VApp 包裹时手动注入 light 主题 CSS 变量 */
-  --v-theme-surface: 255, 255, 255;
-  --v-theme-on-surface: 0, 0, 0;
-  --v-theme-surface-variant: 247, 248, 249;
-  --v-theme-on-surface-variant: 66, 66, 66;
-  --v-theme-primary: 24, 103, 192;
-  --v-theme-on-primary: 255, 255, 255;
-  --v-theme-background: 255, 255, 255;
-  --v-theme-on-background: 0, 0, 0;
-  --v-theme-outline: 115, 115, 115;
-
-  position: absolute;
-  bottom: 68px;
-  right: 0;
-  width: 400px;
-  max-height: min(600px, 70vh);
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  overflow: hidden;
-  background-color: rgb(var(--v-theme-surface));
-  color: rgb(var(--v-theme-on-surface));
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-}
-
-.ai-dialog-header {
-  flex-shrink: 0;
-}
-
-.ai-messages {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.message-row {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.message-user {
-  flex-direction: row-reverse;
-}
-
 .message-avatar {
-  flex-shrink: 0;
   width: 32px;
   height: 32px;
   display: flex;
@@ -282,25 +240,9 @@ async function sendMessage() {
 
 .message-bubble {
   max-width: 75%;
-  padding: 10px 14px;
-  border-radius: 12px;
   font-size: 14px;
   line-height: 1.6;
   word-break: break-word;
-}
-
-.bubble-user {
-  background-color: rgb(var(--v-theme-primary));
-  color: rgb(var(--v-theme-on-primary));
-  border-bottom-right-radius: 4px;
-}
-
-.bubble-ai {
-  background-color: rgb(var(--v-theme-surface-variant));
-  color: rgb(var(--v-theme-on-surface-variant));
-  border-bottom-left-radius: 4px;
-  padding: 0;
-  overflow: hidden;
 }
 
 .ai-markdown :deep(.markdown) {
@@ -314,14 +256,5 @@ async function sendMessage() {
 
 .ai-markdown :deep(.markdown-code) {
   margin: 4px 0;
-}
-
-.ai-input-area {
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-.ai-input {
-  flex: 1;
 }
 </style>
