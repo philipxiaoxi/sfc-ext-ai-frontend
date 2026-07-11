@@ -24,6 +24,20 @@
         />
       </VCardTitle>
 
+      <!-- 模型选择 -->
+      <div class="px-4 pb-2">
+        <VSelect
+          v-model="selectedModelId"
+          :items="modelOptions"
+          item-title="label"
+          item-value="value"
+          density="compact"
+          variant="plain"
+          placeholder="选择模型"
+          hide-details
+        />
+      </div>
+
       <VDivider />
 
       <!-- 消息列表 -->
@@ -70,7 +84,7 @@
           @keydown.enter="sendMessage"
         />
         <VBtn
-          :disabled="!inputText.trim()"
+          :disabled="!inputText.trim() || selectedModelId == null"
           color="primary"
           icon="mdi-send"
           size="40"
@@ -83,16 +97,48 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { ChatMessage } from '../model'
+import { ref, computed, onMounted } from 'vue'
+import type { ChatMessage, ProviderWithModelsVo } from '../model'
 import { MarkdownView } from 'sfc-common/components'
 import { aiChatService, AiChatSession } from '../AiChatService'
+import { QueryApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 
 
 const open = ref(false)
 const inputText = ref('')
 const messages = ref<ChatMessage[]>([])
+const providersWithModels = ref<ProviderWithModelsVo[]>([])
+const selectedModelId = ref<number | null>(null)
+
+const modelOptions = computed(() => {
+  const options: { label: string; value: number }[] = []
+  for (const pm of providersWithModels.value) {
+    for (const model of pm.models) {
+      options.push({
+        label: `${pm.provider.name} / ${model.modelId}`,
+        value: model.id!
+      })
+    }
+  }
+  return options
+})
+
+onMounted(() => {
+  loadModels()
+})
+
+async function loadModels() {
+  try {
+    const data = (await SfcUtils.request(QueryApi.getProvidersWithModels())).data.data
+    providersWithModels.value = data
+    if (data.length > 0 && data[0].models.length > 0) {
+      selectedModelId.value = data[0].models[0].id!
+    }
+  } catch (e) {
+    console.error('加载模型列表失败', e)
+  }
+}
 
 let chatSession: AiChatSession | null = null
 let chatSessionId: string
@@ -133,7 +179,7 @@ function ensureAiMsg() {
 let isStarted = false
 async function sendMessage() {
   const text = inputText.value.trim()
-  if (!text) return
+  if (!text || selectedModelId.value == null) return
 
   inputText.value = ''
 
@@ -152,7 +198,7 @@ async function sendMessage() {
     type: 'CHAT',
     data: {
       content: text,
-      modelId: '1'
+      modelId: selectedModelId.value!
     }
   })
 }
@@ -163,7 +209,6 @@ async function sendMessage() {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 9999;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

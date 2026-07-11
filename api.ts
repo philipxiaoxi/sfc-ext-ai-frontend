@@ -1,4 +1,5 @@
-import type { LlmModel, LlmProvider } from './model'
+import { CommonRequest } from 'sfc-common/model'
+import type { LlmModel, LlmProvider, ProviderWithModelsVo } from './model'
 
 // ────────────────────────── LLM 提供商 API ──────────────────────────
 
@@ -121,5 +122,23 @@ export namespace ModelApi {
       method: 'post',
       params: { providerId }
     }).then(res => res.data)
+  }
+}
+
+// ────────────────────────── 组合查询 API ──────────────────────────
+
+/** 查询 API 前缀 */
+const queryPrefix = '/ai/query'
+
+/** 组合查询相关 API */
+export namespace QueryApi {
+  /**
+   * 查询所有公共和当前用户的模型提供商及其关联模型列表
+   */
+  export function getProvidersWithModels(): CommonRequest<ProviderWithModelsVo[]> {
+    return {
+      url: `${queryPrefix}/providersWithModels`,
+      method: 'get'
+    }
   }
 }

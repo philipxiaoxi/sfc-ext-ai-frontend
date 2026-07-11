@@ -38,6 +38,24 @@ export interface LlmProvider {
   updateAt?: Date
 }
 
+/** 提供商响应 VO（不含敏感信息） */
+export interface ProviderVo {
+  /** 主键 ID */
+  id: number
+  /** 提供商名称 */
+  name: string
+  /** 协议类型 */
+  protocolType: ProtocolType
+}
+
+/** 提供商及其关联模型列表 */
+export interface ProviderWithModelsVo {
+  /** 提供商信息 */
+  provider: ProviderVo
+  /** 关联的模型列表 */
+  models: LlmModel[]
+}
+
 /** LLM 模型 */
 export interface LlmModel {
   /** 主键 ID */
