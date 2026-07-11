@@ -4,6 +4,8 @@ export interface ChatMessage {
   role: 'user' | 'ai'
   /** 消息内容（AI 消息为累积的 markdown 文本） */
   content: string
+  /** 思维链内容（LLM 思考期间输出，作为独立消息展示，与 content 互斥） */
+  reasoningContent?: string
 }
 
 /** 聊天请求体 */

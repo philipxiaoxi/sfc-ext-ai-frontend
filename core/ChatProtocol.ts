@@ -55,8 +55,10 @@ export interface ChatPayload {
 
 /** TEXT 消息 payload */
 export interface TextPayload {
-  /** 文本回复内容 */
-  content: string
+  /** 文本回复内容（LLM 思考结束后输出，与 reasoningContent 互斥） */
+  content: string | null
+  /** 思维链内容（LLM 思考期间输出，与 content 互斥） */
+  reasoningContent?: string | null
 }
 
 /** ERROR 消息 payload */

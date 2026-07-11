@@ -67,11 +67,34 @@
                     : 'bg-surface text-on-surface rounded-lg rounded-bl-0'
                 ]"
               >
-                <MarkdownView
-                  v-if="msg.role === 'ai'"
-                  :content="msg.content"
-                  class="ai-markdown"
-                />
+                <template v-if="msg.role === 'ai'">
+                  <div
+                    v-if="msg.reasoningContent !== undefined"
+                  >
+                    <div
+                      class="d-flex align-center ga-1 thinking-toggle"
+                      @click="toggleThinking(i)"
+                    >
+                      <VIcon
+                        :icon="expandedThinking[i] ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                        size="16"
+                      />
+                      <div class="text-caption font-weight-medium tip">
+                        Thinking
+                      </div>
+                    </div>
+                    <div v-show="expandedThinking[i]">
+                      <div class="thinking-bubble px-1 py-1 text-on-surface">
+                        <MarkdownView :content="msg.reasoningContent" class="thinking-markdown" />
+                      </div>
+                      
+                    </div>
+                  </div>
+                  <MarkdownView
+                    :content="msg.content"
+                    class="ai-markdown"
+                  />
+                </template>
                 <template v-else>
                   {{ msg.content }}
                 </template>
@@ -140,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, Teleport } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive } from 'vue'
 import type { ChatMessage, ProviderWithModelsVo } from '../model'
 import { MarkdownView } from 'sfc-common/components'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
@@ -152,6 +175,11 @@ const inputText = ref('')
 const messages = ref<ChatMessage[]>([])
 const providersWithModels = ref<ProviderWithModelsVo[]>([])
 const selectedModelId = ref<number | null>(null)
+const expandedThinking = ref(reactive({} as Record<number, boolean>))
+
+function toggleThinking(index: number) {
+  expandedThinking.value[index] = !expandedThinking.value[index]
+}
 
 const modelOptions = computed(() => {
   const options: { label: string; value: number }[] = []
@@ -190,9 +218,24 @@ async function ensureSession() {
   }
   chatSession = await aiChatService.connect()
   chatSession.onMessage(resp => {
-    const aiMsg = ensureAiMsg()
     if (resp.type == 'TEXT') {
-      aiMsg.content += resp.data.content
+      const aiMsg = ensureAiMsg()
+      const { content, reasoningContent } = resp.data
+      if (reasoningContent != null) {
+        if (!aiMsg.reasoningContent) {
+          aiMsg.reasoningContent = ''
+        }
+        aiMsg.reasoningContent += reasoningContent
+      }
+      if (content != null) {
+        aiMsg.content += content
+      }
+    } else if (resp.type == 'THINKING_START') {
+      // 可选：在思考开始时添加占位提示
+      const hasThinking = messages.value.some(m => m.role === 'ai')
+      if (!hasThinking) {
+        messages.value.push({ role: 'ai', content: '', reasoningContent: '' })
+      }
     } else if (resp.type == 'ERROR') {
       SfcUtils.snackbar(resp.data.message)
     } else if (resp.type == 'SESSION_ACK') {
@@ -208,12 +251,18 @@ async function ensureSession() {
 }
 
 function ensureAiMsg() {
-  let aiMsg = messages.value.findLast(e => e.role == 'ai')
-  if (aiMsg) {
-    return aiMsg
+  const lastMsg = messages.value[messages.value.length - 1]
+  if (lastMsg && lastMsg.role === 'ai') {
+    return lastMsg
   }
-  aiMsg = { role: 'ai', content: '' }
+  // 最后一条是用户消息或没有消息，创建一条新的空 AI 消息用于流式追加
+  const aiMsg: ChatMessage = { role: 'ai', content: '' }
   messages.value.push(aiMsg)
+  // 新消息默认展开 Thinking
+  if (!expandedThinking.value) {
+    expandedThinking.value = reactive({})
+  }
+  expandedThinking.value[messages.value.length - 1] = true
   return aiMsg
 }
 
@@ -242,8 +291,6 @@ async function sendMessage() {
   inputText.value = ''
 
   messages.value.push({ role: 'user', content: text })
-
-  messages.value.push({ role: 'ai', content: '' })
 
   const s = await ensureSession()
   if (!isStarted) {
@@ -322,6 +369,40 @@ export default defineComponent({
 }
 
 .ai-markdown :deep(.markdown-code) {
+  margin: 4px 0;
+}
+
+.thinking-bubble {
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+  color: rgb(var(--v-theme-on-surface));
+  background-color: rgba(var(--v-theme-secondary), 0.15);
+  border-left: 3px solid rgba(var(--v-theme-primary), 0.2);
+}
+
+.thinking-toggle {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.thinking-toggle:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.thinking-markdown :deep(.markdown) {
+  font-size: 13px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.thinking-markdown :deep(.markdown > *) {
+  margin: 4px 0;
+}
+
+.thinking-markdown :deep(.markdown-code) {
   margin: 4px 0;
 }
 </style>
