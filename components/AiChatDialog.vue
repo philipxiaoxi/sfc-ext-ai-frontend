@@ -34,19 +34,6 @@
               title="收起"
             />
           </div>
-          <div class="px-3 pb-2 pt-1">
-            <VSelect
-              v-model="selectedModelId"
-              :items="modelOptions"
-              item-title="label"
-              item-value="value"
-              density="compact"
-              variant="underlined"
-              placeholder="选择模型"
-              hide-details
-            />
-          </div>
-          <VDivider />
           <div class="ai-messages flex-grow-1 overflow-y-auto px-4 py-4 d-flex flex-column">
             <div
               v-if="messages.length === 0"
@@ -103,14 +90,46 @@
                 class="flex-grow-1"
                 @keydown.enter="sendMessage"
               />
+              <VMenu
+                location="top end"
+                offset="8"
+              >
+                <template #activator="{ props }">
+                  <VBtn
+                    v-bind="props"
+                    icon="mdi-cog-outline"
+                    size="40"
+                    variant="flat"
+                    color="default"
+                  />
+                </template>
+                <VCard
+                  min-width="280"
+                  max-width="320"
+                >
+                  <VCardText class="pa-3">
+                    <VSelect
+                      v-model="selectedModelId"
+                      :items="modelOptions"
+                      item-title="label"
+                      item-value="value"
+                      label="选择模型"
+                      density="compact"
+                      variant="outlined"
+                      hide-details
+                    />
+                  </VCardText>
+                </VCard>
+              </VMenu>
               <VBtn
                 :disabled="!inputText.trim() || selectedModelId == null"
                 color="primary"
-                icon="mdi-send"
                 size="40"
                 variant="flat"
                 @click="sendMessage"
-              />
+              >
+                <VIcon icon="mdi-arrow-up" />
+              </VBtn>
             </div>
           </div>
         </div>
