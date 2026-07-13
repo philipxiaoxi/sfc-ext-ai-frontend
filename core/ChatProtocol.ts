@@ -30,6 +30,7 @@ export type LlmMessageType =
   | 'TEXT'
   | 'DONE'
   | 'ERROR'
+  | 'TITLE_UPDATE'
 
 // ────────────────────────── 请求 Payload ──────────────────────────
 
@@ -91,6 +92,14 @@ export interface ToolCallPayload {
   result: string
 }
 
+/** TITLE_UPDATE 消息 payload */
+export interface TitleUpdatePayload {
+  /** LLM 自动生成的标题 */
+  title: string
+  /** 会话 ID，对应 SESSION_ACK 返回的 sessionId */
+  conversationId: string
+}
+
 /** TOOL_CALL_START 消息 payload */
 export interface ToolCallStartPayload {
   /** 工具调用唯一 id，用于关联 TOOL_CALL_START 与 TOOL_CALL_END */
@@ -150,11 +159,10 @@ export type ChatRequest =
 export type LlmResponse =
   | { type: 'SESSION_ACK'; data: SessionAckPayload }
   | { type: 'TEXT'; data: TextPayload }
-  | { type: 'THINKING_START' }
-  | { type: 'THINKING_END' }
   | { type: 'TOOL_CALL'; data: ToolCallPayload }
   | { type: 'TOOL_CALL_START'; data: ToolCallStartPayload }
   | { type: 'TOOL_CALL_END'; data: ToolCallEndPayload }
   | { type: 'TOOL_CALL_REQ' }
   | { type: 'DONE'; data: DonePayload }
   | { type: 'ERROR'; data: ErrorPayload }
+  | { type: 'TITLE_UPDATE'; data: TitleUpdatePayload }

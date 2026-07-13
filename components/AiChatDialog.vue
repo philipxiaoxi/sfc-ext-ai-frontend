@@ -23,7 +23,7 @@
           >
             <div class="d-flex align-center ga-2">
               <VIcon icon="mdi-robot" color="primary" size="24" />
-              <span class="text-subtitle-1 font-weight-bold">AI 助手</span>
+              <span class="text-subtitle-1 font-weight-bold">{{ conversationTitle }}</span>
             </div>
             <VSpacer />
             <VBtn
@@ -218,6 +218,7 @@ const inputText = ref('')
 const messages = ref<ChatMessage[]>([])
 const providersWithModels = ref<ProviderWithModelsVo[]>([])
 const selectedModelId = ref<number | null>(null)
+const conversationTitle = ref('AI 助手')
 const expandedThinking = ref(reactive({} as Record<number, boolean>))
 const expandedArgs = ref(reactive({} as Record<number, boolean>))
 
@@ -290,6 +291,7 @@ async function ensureSession() {
   chatSession = await aiChatService.connect()
   chatSession.onMessage(resp => {
     if (resp.type == 'TEXT') {
+      // 思考内容 或 正文响应
       const aiMsg = ensureAiMsg()
       const { content, reasoningContent } = resp.data
       if (reasoningContent != null) {
@@ -301,16 +303,12 @@ async function ensureSession() {
       if (content != null) {
         aiMsg.content += content
       }
-    } else if (resp.type == 'THINKING_START') {
-      // 可选：在思考开始时添加占位提示
-      const hasThinking = messages.value.some(m => m.role === 'ai')
-      if (!hasThinking) {
-        messages.value.push({ role: 'ai', content: '', reasoningContent: '' })
-      }
     } else if (resp.type == 'TOOL_CALL_START') {
+      // 通知开始调用工具
       const payload = resp.data
       messages.value.push({ role: 'tool', id: payload.id, name: payload.name, arguments: payload.arguments, status: 'pending' })
     } else if (resp.type == 'TOOL_CALL_END') {
+      // 通知工具调用完成
       const payload = resp.data
       const idx = messages.value.findIndex(m => m.role === 'tool' && m.id === payload.id)
       if (idx >= 0) {
@@ -319,14 +317,22 @@ async function ensureSession() {
         msg.status = 'done'
       }
     } else if (resp.type == 'ERROR') {
+      // 出错
       SfcUtils.snackbar(resp.data.message)
     } else if (resp.type == 'DONE') {
+      // LLM 完成响应
       const { modelId, time } = resp.data
       if (modelId != null && time != null) {
         messages.value.push({ role: 'done', modelId, time })
       }
     } else if (resp.type == 'SESSION_ACK') {
+      // 会话建立确认
       chatSessionId = resp.data.sessionId
+    } else if (resp.type == 'TITLE_UPDATE') {
+      // 收到标题更新消息，匹配当前会话则更新显示的标题
+      if (resp.data.conversationId === chatSessionId) {
+        conversationTitle.value = resp.data.title
+      }
     }
   })
   chatSession.onClose(() => {
@@ -391,6 +397,8 @@ async function sendMessage() {
       modelId: selectedModelId.value!
     }
   })
+  // 产生一条空AI回复以便在对话框中显示出来，让用户认为AI在等待
+  ensureAiMsg()
 }
 </script>
 
