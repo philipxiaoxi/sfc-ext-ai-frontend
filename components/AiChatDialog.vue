@@ -210,6 +210,7 @@ import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive } from
 import type { ChatMessage, ToolMessage, ProviderWithModelsVo } from '../model'
 import { MarkdownView, UserAvatar } from 'sfc-common/components'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
+import { askUserTool, openLinkForUser } from '../core/CommonTools'
 import { QueryApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 
@@ -284,12 +285,20 @@ async function loadModels() {
 
 let chatSession: AiChatSession | null = null
 let chatSessionId: string
+let sessionReadyResolve: (() => void) | null = null
+
 async function ensureSession() {
   if (chatSession) {
     return chatSession
   }
   chatSession = await aiChatService.connect()
-  chatSession.onMessage(resp => {
+
+  // 创建一个 Promise，工具全部注册完成后 resolve
+  const sessionReady = new Promise<void>(resolve => {
+    sessionReadyResolve = resolve
+  })
+
+  chatSession.onMessage(async resp => {
     if (resp.type == 'TEXT') {
       // 思考内容 或 正文响应
       const aiMsg = ensureAiMsg()
@@ -304,7 +313,7 @@ async function ensureSession() {
         aiMsg.content += content
       }
     } else if (resp.type == 'TOOL_CALL_START') {
-      // 通知开始调用工具
+      // 通知开始调用工具（内建工具 或 动态注册工具均由服务层合成此事件）
       const payload = resp.data
       messages.value.push({ role: 'tool', id: payload.id, name: payload.name, arguments: payload.arguments, status: 'pending' })
     } else if (resp.type == 'TOOL_CALL_END') {
@@ -328,6 +337,11 @@ async function ensureSession() {
     } else if (resp.type == 'SESSION_ACK') {
       // 会话建立确认
       chatSessionId = resp.data.sessionId
+      // 会话建立后注册通用工具，让 LLM 可通过前端工具与用户交互
+      await chatSession?.registerTool(askUserTool)
+      await chatSession?.registerTool(openLinkForUser)
+      // 所有工具注册完成，通知 ensureSession 继续
+      sessionReadyResolve?.()
     } else if (resp.type == 'TITLE_UPDATE') {
       // 收到标题更新消息，匹配当前会话则更新显示的标题
       if (resp.data.conversationId === chatSessionId) {
@@ -338,8 +352,13 @@ async function ensureSession() {
   chatSession.onClose(() => {
     SfcUtils.alert('AI 聊天连接已断开')
     chatSession = null
-    isStarted = false
   })
+
+  // 发送 START_SESSION 开启会话
+  chatSession.start()
+
+  // 等待工具注册完成后再返回，确保后续 CHAT 消息发送时工具已就绪
+  await sessionReady
   return chatSession
 }
 
@@ -370,8 +389,6 @@ onUnmounted(() => {
   document.querySelector('main')?.style.removeProperty('padding-right')
 })
 
-let isStarted = false
-
 function onInputEnter(e: KeyboardEvent) {
   if (e.isComposing) return
   sendMessage()
@@ -386,10 +403,6 @@ async function sendMessage() {
   messages.value.push({ role: 'user', content: text })
 
   const s = await ensureSession()
-  if (!isStarted) {
-    s.start(chatSessionId)
-    isStarted = true
-  }
   s.send({
     type: 'CHAT',
     data: {

@@ -1,5 +1,5 @@
 import { WebSocketService } from 'sfc-common'
-import type { ChatRequest, LlmResponse } from './ChatProtocol'
+import type { ChatRequest, LlmResponse, ToolParameterSchema, ToolHandler, ToolCallReqPayload, ToolRegistration } from './ChatProtocol'
 
 // ────────────────────────── 接口定义 ──────────────────────────
 
@@ -86,6 +86,38 @@ export interface AiChatSession {
    * ```
    */
   onClose(handler: (event: CloseEvent) => void): void
+
+  /**
+   * 注册一个动态工具及其实现函数。
+   *
+   * 向服务端发送 `REGISTER_TOOL` 注册工具元数据，同时在本地保存 handler，
+   * 当服务端下发 `TOOL_CALL_REQ` 时自动执行 handler 并回复 `TOOL_ACK`。
+   *
+   * 工具调用期间会向 {@link onMessage} 同步合成 `TOOL_CALL_START` / `TOOL_CALL_END`
+   * 事件，供 UI 层展示工具调用状态。
+   *
+   * @param registration 工具注册信息，包含 name / description / parameters / handler
+   *
+   * @example
+   * ```ts
+   * session.registerTool({
+   *   name: 'ask_user',
+   *   description: '当需要用户进行决策或确认时，向用户提出一个问题并等待用户回答',
+   *   parameters: {
+   *     type: 'object',
+   *     properties: {
+   *       question: { type: 'string', description: '向用户提问的问题' }
+   *     },
+   *     required: ['question']
+   *   },
+   *   handler: async (args) => {
+   *     const answer = await SfcUtils.prompt({ title: '确认', label: args.question })
+   *     return JSON.stringify({ 问题: answer })
+   *   }
+   * })
+   * ```
+   */
+  registerTool(registration: ToolRegistration): Promise<void>
 }
 
 /**
@@ -130,6 +162,16 @@ class AiChatSessionImpl implements AiChatSession {
   /** 当前注册的连接关闭回调函数 */
   private closeHandler: ((event: CloseEvent) => void) | null = null
 
+  /** 已注册的动态工具名称 → 实现函数映射 */
+  private toolHandlers: Map<string, ToolHandler> = new Map()
+
+  /** 等待服务端确认的工具注册（REGISTER_TOOL_ACK） */
+  private pendingRegistrations: Map<string, {
+    resolve: () => void
+    reject: (reason: Error) => void
+    timer: ReturnType<typeof setTimeout>
+  }> = new Map()
+
   /**
    * @param ws 已建立连接的 WebSocket 实例
    */
@@ -140,14 +182,39 @@ class AiChatSessionImpl implements AiChatSession {
     this.ws.onmessage = (event: MessageEvent) => {
       try {
         const response: LlmResponse = JSON.parse(event.data)
+        // 拦截 REGISTER_TOOL_ACK：匹配待确认的注册并 resolve Promise
+        if (response.type === 'REGISTER_TOOL_ACK') {
+          const name = response.data
+          const entry = this.pendingRegistrations.get(name)
+          if (entry) {
+            clearTimeout(entry.timer)
+            entry.resolve()
+            this.pendingRegistrations.delete(name)
+          }
+          return // 已消费，不再转发给外部 handler
+        }
+        // 拦截 TOOL_CALL_REQ：若为已注册的动态工具，自动执行 handler 并回复 TOOL_ACK
+        if (response.type === 'TOOL_CALL_REQ') {
+          const toolHandler = this.toolHandlers.get(response.data.name)
+          if (toolHandler) {
+            this.handleToolCallReq(response.data, toolHandler)
+            return // 已处理，不再转发给外部 handler
+          }
+        }
         this.handler?.(response)
       } catch (e) {
         console.error('[AiChatSession] 消息反序列化失败:', e, event.data)
       }
     }
 
-    // 连接关闭时派发给注册的 closeHandler
+    // 连接关闭时派发给注册的 closeHandler，并 reject 所有待确认的注册
     this.ws.onclose = (event: CloseEvent) => {
+      // Reject 所有等待 REGISTER_TOOL_ACK 的 Promise
+      this.pendingRegistrations.forEach(entry => {
+        clearTimeout(entry.timer)
+        entry.reject(new Error('WebSocket 连接已关闭'))
+      })
+      this.pendingRegistrations.clear()
       this.closeHandler?.(event)
     }
   }
@@ -171,6 +238,64 @@ class AiChatSessionImpl implements AiChatSession {
 
   stop(): void {
     this.send({ type: 'STOP' })
+  }
+
+  registerTool(registration: ToolRegistration): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // 设置超时，防止服务端不响应导致 Promise 一直 pending
+      const timer = setTimeout(() => {
+        this.pendingRegistrations.delete(registration.name)
+        reject(new Error(`工具注册超时: ${registration.name}`))
+      }, 10000)
+
+      // 将 resolve/reject 存入 map，待 REGISTER_TOOL_ACK 到达时处理
+      this.pendingRegistrations.set(registration.name, { resolve, reject, timer })
+
+      // 向服务端注册工具元数据
+      this.send({
+        type: 'REGISTER_TOOL',
+        data: {
+          name: registration.name,
+          description: registration.description,
+          parameters: JSON.stringify(registration.parameters)
+        }
+      })
+
+      // 本地保存 handler，供 TOOL_CALL_REQ 到达时自动执行
+      this.toolHandlers.set(registration.name, registration.handler)
+    })
+  }
+
+  // ──────────── 私有方法 ────────────
+
+  /**
+   * 处理 TOOL_CALL_REQ：执行 handler 并回复 TOOL_ACK。
+   *
+   * 执行前后分别向外部 handler 合成 TOOL_CALL_START / TOOL_CALL_END 事件，
+   * 供 UI 层展示工具调用状态。
+   */
+  private async handleToolCallReq(payload: ToolCallReqPayload, toolHandler: ToolHandler): Promise<void> {
+
+    // 1) 解析参数并执行 handler
+    let result: string
+    try {
+      const args = JSON.parse(payload.arguments)
+      result = await toolHandler(args)
+    } catch (e) {
+      console.error(`[AiChatSession] 工具 ${payload.name} 执行失败:`, e)
+      result = `工具执行失败: ${e}`
+    }
+
+    // 2) 发送 TOOL_ACK 将结果交回服务端
+    this.send({
+      type: 'TOOL_ACK',
+      data: {
+        id: payload.id,
+        name: payload.name,
+        arguments: JSON.parse(payload.arguments),
+        result
+      }
+    })
   }
 }
 

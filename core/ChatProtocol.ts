@@ -14,7 +14,7 @@ import { IdType } from 'sfc-common/model'
 // ────────────────────────── 用户消息类型 ──────────────────────────
 
 /** 用户消息类型枚举（对应后端 UserMessageType） */
-export type UserMessageType = 'START_SESSION' | 'CHAT' | 'TOOL_ACK' | 'STOP'
+export type UserMessageType = 'START_SESSION' | 'CHAT' | 'TOOL_ACK' | 'STOP' | 'REGISTER_TOOL'
 
 // ────────────────────────── 服务端消息类型 ──────────────────────────
 
@@ -31,6 +31,7 @@ export type LlmMessageType =
   | 'DONE'
   | 'ERROR'
   | 'TITLE_UPDATE'
+  | 'REGISTER_TOOL_ACK'
 
 // ────────────────────────── 请求 Payload ──────────────────────────
 
@@ -124,6 +125,84 @@ export interface ToolCallEndPayload {
   result: string
 }
 
+/**
+ * JSON Schema 工具参数定义。
+ *
+ * 提供给 {@link AiChatSession.registerTool} 使用，方法内部会自动序列化为 JSON 字符串，
+ * 调用方无需手动 `JSON.stringify`。
+ */
+export interface ToolParameterSchemaProperty {
+  type: string
+  description?: string
+  /** 当 type 为 'array' 时，描述数组元素的 schema */
+  items?: ToolParameterSchemaProperty
+}
+
+export interface ToolParameterSchema {
+  type: 'object'
+  properties: Record<string, ToolParameterSchemaProperty>
+  required?: string[]
+}
+
+/**
+ * 动态工具的实现函数类型。
+ *
+ * 接收解析后的参数对象，返回工具执行结果字符串。
+ * 支持同步和异步两种模式。
+ *
+ * @param args 解析后的工具参数（key-value 对象）
+ * @returns 工具执行结果，将作为 TOOL_ACK 的 result 字段发送给服务端
+ */
+export type ToolHandler = (args: Record<string, any>) => string | Promise<string>
+
+/** REGISTER_TOOL 消息 payload */
+export interface RegisterToolPayload {
+  /** 工具名称，在当前会话中唯一 */
+  name: string
+  /** 工具描述，供 LLM 理解工具用途 */
+  description: string
+  /** JSON Schema 格式的参数字符串 */
+  parameters: string
+}
+
+/**
+ * 动态工具注册信息。
+ *
+ * 提供给 {@link AiChatSession.registerTool} 使用，将工具元数据与实现函数封装为一个对象。
+ */
+export interface ToolRegistration {
+  /** 工具名称，在当前会话中唯一 */
+  name: string
+  /** 工具描述，供 LLM 理解工具用途 */
+  description: string
+  /** JSON Schema 格式的参数定义（传入对象，内部自动序列化） */
+  parameters: ToolParameterSchema
+  /** 工具实现函数，接收解析后的参数对象，返回结果字符串 */
+  handler: ToolHandler
+}
+
+/** TOOL_CALL_REQ 消息 payload */
+export interface ToolCallReqPayload {
+  /** 工具调用唯一 ID，用于关联 TOOL_CALL_REQ 与 TOOL_ACK */
+  id: string
+  /** 工具名称 */
+  name: string
+  /** 工具参数（JSON 格式字符串） */
+  arguments: string
+}
+
+/** TOOL_ACK 消息 payload */
+export interface ToolAckPayload {
+  /** 与 TOOL_CALL_REQ 的 id 一致 */
+  id: string
+  /** 工具函数名称 */
+  name: string
+  /** 调用参数（与 TOOL_CALL_REQ 中的参数一致） */
+  arguments: Record<string, any>
+  /** 工具执行结果 */
+  result: string
+}
+
 
 // ────────────────────────── 请求消息（客户端 → 服务端） ──────────────────────────
 
@@ -139,8 +218,9 @@ export interface ToolCallEndPayload {
 export type ChatRequest =
   | { type: 'START_SESSION'; data?: StartSessionPayload }
   | { type: 'CHAT'; data: ChatPayload }
-  | { type: 'TOOL_ACK'; data?: any }
+  | { type: 'TOOL_ACK'; data: ToolAckPayload }
   | { type: 'STOP' }
+  | { type: 'REGISTER_TOOL'; data: RegisterToolPayload }
 
 // ────────────────────────── 响应消息（服务端 → 客户端） ──────────────────────────
 
@@ -162,7 +242,8 @@ export type LlmResponse =
   | { type: 'TOOL_CALL'; data: ToolCallPayload }
   | { type: 'TOOL_CALL_START'; data: ToolCallStartPayload }
   | { type: 'TOOL_CALL_END'; data: ToolCallEndPayload }
-  | { type: 'TOOL_CALL_REQ' }
+  | { type: 'TOOL_CALL_REQ'; data: ToolCallReqPayload }
+  | { type: 'REGISTER_TOOL_ACK'; data: string }
   | { type: 'DONE'; data: DonePayload }
   | { type: 'ERROR'; data: ErrorPayload }
   | { type: 'TITLE_UPDATE'; data: TitleUpdatePayload }
