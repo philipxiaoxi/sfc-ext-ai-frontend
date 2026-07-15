@@ -21,7 +21,6 @@
             <!-- 标题区域，点击可收起侧边栏 -->
             <div
               class="d-flex align-center ga-2 chat-header-collapse"
-              @click="drawerOpen = false"
             >
               <VIcon icon="mdi-robot" color="primary" size="24" />
               <span class="text-subtitle-1 font-weight-bold">{{ conversationTitle }}</span>
@@ -33,15 +32,13 @@
                 icon="mdi-plus"
                 density="comfortable"
                 variant="text"
-                size="small"
                 title="开启新会话"
                 @click.stop="startNewSession"
               />
               <VBtn
-                icon="mdi-format-list-bulleted"
+                icon="mdi-history"
                 density="comfortable"
                 variant="text"
-                size="small"
                 title="查看历史会话"
                 @click.stop="openHistoryPanel"
               />
@@ -50,12 +47,11 @@
               icon="mdi-chevron-right"
               density="comfortable"
               variant="text"
-              size="small"
               title="收起"
               @click="drawerOpen = false"
             />
           </div>
-          <div class="ai-messages flex-grow-1 overflow-y-auto px-4 py-4 d-flex flex-column">
+          <div ref="messagesContainer" class="ai-messages flex-grow-1 overflow-y-auto px-4 py-4 d-flex flex-column">
             <div
               v-if="messages.length === 0"
               class="flex-grow-1 d-flex flex-column text-medium-emphasis"
@@ -264,7 +260,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive, nextTick } from 'vue'
 import type { ChatMessage, ToolMessage, ProviderWithModelsVo, AiConversation, ConversationHistoryVo } from '../model'
 import { MarkdownView, UserAvatar } from 'sfc-common/components'
 import ConversationList from './ConversationList.vue'
@@ -272,6 +268,7 @@ import { aiChatService, AiChatSession } from '../core/AiChatService'
 import { askUserTool, openLinkForUser } from '../core/CommonTools'
 import { QueryApi, ConversationApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
+import { useAutoScroll } from '../composables/useAutoScroll'
 
 const drawerOpen = ref(false)
 const inputText = ref('')
@@ -432,6 +429,9 @@ async function enterConversation(conv: AiConversation) {
   // 切换到 chat 模式并关闭历史面板
   viewMode.value = 'chat'
   showHistoryPanel.value = false
+
+  // 等待 DOM 更新后滚动到消息列表底部
+  nextTick(scrollToBottom)
 }
 
 /**
@@ -442,7 +442,7 @@ function startNewSession() {
   messages.value = []
   activeConversationId.value = null
   chatSessionId = ''
-  conversationTitle.value = 'AI 助手'
+  conversationTitle.value = '新会话'
   viewMode.value = 'chat'
   showHistoryPanel.value = false
 }
@@ -462,6 +462,27 @@ function openHistoryPanel() {
  */
 function closeHistoryPanel() {
   showHistoryPanel.value = false
+}
+
+/** 消息列表容器的模板引用 */
+const messagesContainer = ref<HTMLElement | null>(null)
+const { scrollToBottom, isNearBottom, autoScrollIfNearBottom } = useAutoScroll(messagesContainer)
+
+/**
+ * 将当前 AI 消息的思维链内容区域滚动到底部，使用户能实时看到最新的思考内容。
+ */
+function scrollThinkingToBottom() {
+  const container = messagesContainer.value
+  if (!container) return
+  // 找到最后一个思维链容器（当前正在流式输出的 AI 消息）
+  const thinkingEls = container.querySelectorAll('.thinking-markdown')
+  if (thinkingEls.length === 0) return
+  const lastThinking = thinkingEls[thinkingEls.length - 1] as HTMLElement
+  // 思维链内容区域（.markdown）设置了 max-height + overflow，是实际可滚动的元素
+  const markdownEl = lastThinking.querySelector('.markdown') as HTMLElement | null
+  if (markdownEl) {
+    markdownEl.scrollTop = markdownEl.scrollHeight
+  }
 }
 
 let chatSession: AiChatSession | null = null
@@ -493,6 +514,10 @@ async function ensureSession(sessionId?: string) {
       if (content != null) {
         aiMsg.content += content
       }
+      // DOM 更新后，跟随外层滚动，同时将思维链区域滚到底部
+      await nextTick()
+      autoScrollIfNearBottom()
+      scrollThinkingToBottom()
     } else if (resp.type == 'TOOL_CALL_START') {
       // 通知开始调用工具（内建工具 或 动态注册工具均由服务层合成此事件）
       const payload = resp.data
@@ -531,7 +556,10 @@ async function ensureSession(sessionId?: string) {
     }
   })
   chatSession.onClose(() => {
-    SfcUtils.alert('AI 聊天连接已断开')
+    const lastMsg = messages.value[messages.value.length - 1]
+    if (!lastMsg || lastMsg.role !== 'done') {
+      SfcUtils.alert('AI 聊天连接已断开')
+    }
     chatSession = null
   })
 
@@ -603,6 +631,9 @@ async function sendMessage() {
   })
   // 产生一条空AI回复以便在对话框中显示出来，让用户认为AI在等待
   ensureAiMsg()
+
+  // 等待 DOM 更新后滚动到底部
+  nextTick(scrollToBottom)
 }
 </script>
 
@@ -622,13 +653,9 @@ export default defineComponent({
 }
 
 .chat-header-collapse {
-  cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.chat-header-collapse:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
 
 .ai-fab {
   position: fixed;
@@ -657,10 +684,6 @@ export default defineComponent({
 
 .message-bubble + .message-bubble {
   margin-bottom: 12px;
-}
-
-.ai-messages {
-  scroll-behavior: smooth;
 }
 
 .ai-markdown :deep(.markdown) {
