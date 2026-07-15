@@ -74,6 +74,14 @@ export interface AiChatSession {
   stop(): void
 
   /**
+   * 关闭底层 WebSocket 连接。
+   *
+   * 调用后当前会话将不可用，需重新调用 {@link AiChatService.connect} 建立新连接。
+   * 会触发 onClose 回调，并将 chatSession 置为 null。
+   */
+  close(): void
+
+  /**
    * 注册连接关闭回调。当 WebSocket 连接关闭时调用此函数。
    *
    * @param handler 连接关闭后的回调函数，可选参数为关闭事件对象
@@ -238,6 +246,10 @@ class AiChatSessionImpl implements AiChatSession {
 
   stop(): void {
     this.send({ type: 'STOP' })
+  }
+
+  close(): void {
+    this.ws.close()
   }
 
   registerTool(registration: ToolRegistration): Promise<void> {

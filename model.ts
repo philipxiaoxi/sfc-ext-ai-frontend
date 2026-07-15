@@ -99,6 +99,48 @@ export interface ProviderWithModelsVo {
   models: LlmModel[]
 }
 
+/** AI 对话记录（对应后端 AiConversation PO） */
+export interface AiConversation {
+  /** 会话 ID（对应 WebSocket 协议的 sessionId） */
+  conversationId: string
+  /** 对话标题（由 LLM 自动生成） */
+  title: string
+  /** 创建时间 */
+  createAt?: string
+  /** 更新时间 */
+  updateAt?: string
+}
+
+/** 对话历史响应 VO */
+export interface ConversationHistoryVo {
+  /** 会话 ID */
+  conversationId: string
+  /** 对话标题 */
+  title: string
+  /** 历史消息列表（按发生顺序排列） */
+  messages: HistoryMessageVo[]
+}
+
+/** 历史消息 VO（对应后端 HistoryMessageVo，兼容前端 ChatMessage 联合类型） */
+export interface HistoryMessageVo {
+  /** 角色：user / ai / tool */
+  role: 'user' | 'ai' | 'tool'
+  /** 消息文本内容（user / ai） */
+  content?: string
+  /** 推理思考内容（ai） */
+  reasoningContent?: string
+  /** 工具调用 ID（tool） */
+  id?: string
+  /** 工具名称（tool） */
+  name?: string
+  /** 工具参数 JSON 字符串（tool） */
+  arguments?: string
+  /** 工具执行结果（tool） */
+  result?: string
+  /** 工具调用状态：pending / done（tool） */
+  status?: string
+}
+
 /** LLM 模型 */
 export interface LlmModel {
   /** 主键 ID */

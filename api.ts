@@ -1,5 +1,5 @@
 import { CommonRequest } from 'sfc-common/model'
-import type { AdapterInfo, LlmModel, LlmProvider, ProviderWithModelsVo } from './model'
+import type { AdapterInfo, AiConversation, ConversationHistoryVo, LlmModel, LlmProvider, ProviderWithModelsVo } from './model'
 
 // ────────────────────────── LLM 适配器 API ──────────────────────────
 
@@ -140,6 +140,36 @@ export namespace ModelApi {
       method: 'post',
       params: { providerId }
     }).then(res => res.data)
+  }
+}
+
+// ────────────────────────── AI 对话管理 API ──────────────────────────
+
+/** 对话 API 前缀 */
+const conversationPrefix = '/ai/conversation'
+
+/** AI 对话管理相关 API */
+export namespace ConversationApi {
+  /**
+   * 获取当前用户的对话列表，按更新时间降序排列
+   */
+  export function getList(): CommonRequest<AiConversation[]> {
+    return {
+      url: `${conversationPrefix}/list`,
+      method: 'get'
+    }
+  }
+
+  /**
+   * 获取指定会话的完整历史消息记录
+   * @param conversationId 会话 ID（对应 WebSocket 协议的 sessionId）
+   */
+  export function getMessages(conversationId: string): CommonRequest<ConversationHistoryVo> {
+    return {
+      url: `${conversationPrefix}/messages`,
+      method: 'get',
+      params: { conversationId }
+    }
   }
 }
 
