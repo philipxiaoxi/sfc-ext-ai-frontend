@@ -443,7 +443,7 @@ function startNewSession() {
   activeConversationId.value = null
   chatSessionId = ''
   conversationTitle.value = '新会话'
-  viewMode.value = 'chat'
+  viewMode.value = 'list'
   showHistoryPanel.value = false
 }
 
@@ -557,6 +557,8 @@ async function ensureSession(sessionId?: string) {
   })
   chatSession.onClose(() => {
     const lastMsg = messages.value[messages.value.length - 1]
+    console.log(lastMsg)
+    
     if (!lastMsg || lastMsg.role !== 'done') {
       SfcUtils.alert('AI 聊天连接已断开')
     }
