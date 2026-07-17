@@ -18,6 +18,9 @@
 
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 import type { ToolRegistration } from './ChatProtocol'
+import { getContext, openFileDialog } from 'sfc-common'
+import { DefaultFileSystemHandler } from 'sfc-common'
+import { ref } from 'vue'
 
 /**
  * ask_user 工具：当 LLM 需要用户决策或确认时，向用户提问并收集回答。
@@ -57,13 +60,47 @@ export const askUserTool: ToolRegistration = {
         autofocus: true,
         extraDialogOptions: {
           persistent: true
-        }
+        },
+        cancelToReject: false
       })
       answers[q] = answer || '用户未回答'
     }
     return JSON.stringify(answers)
   }
 }
+
+export const requireUserUpload: ToolRegistration = {
+  name: 'require_user_upload',
+  description: '要求用户上传一个文件。通过该工具会弹出上传对话框让用户上传文件。',
+  parameters: {
+    type: 'object',
+    properties: {
+      disk: {
+        type: 'string',
+        description: '让用户上传的网盘位置。"private"表示用户的私人网盘，"public"表示公共网盘'
+      },
+      path: {
+        type: 'string',
+        description: '文件上传后所在的目录路径。/作为开头和路径分割字符'
+      }
+    },
+    required: ['disk', 'path']
+  },
+  handler: async(args) => {
+    const uid = args.disk == 'public' ? '0' : getContext().session.value.user.id
+    const handler = new DefaultFileSystemHandler(ref(uid))
+    try {
+      const f = await openFileDialog()
+      const savePath = await SfcUtils.loadingDialogTask({ msg: '上传中' }, async() => {
+        return await handler.uploadDirect(args.path, f[0])
+      })
+      return '文件上传到了: ' + savePath
+    } catch(e) {
+      return '用户未上传文件: ' + e
+    }
+  }
+}
+
 
 /**
  * open_link_for_link 工具：在浏览器新标签页中打开指定链接。

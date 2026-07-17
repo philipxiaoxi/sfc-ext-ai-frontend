@@ -265,7 +265,7 @@ import type { ChatMessage, ToolMessage, ProviderWithModelsVo, AiConversation, Co
 import { MarkdownView, UserAvatar } from 'sfc-common/components'
 import ConversationList from './ConversationList.vue'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
-import { askUserTool, openLinkForUser } from '../core/CommonTools'
+import { askUserTool, openLinkForUser, requireUserUpload } from '../core/CommonTools'
 import { QueryApi, ConversationApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 import { useAutoScroll } from '../composables/useAutoScroll'
@@ -545,6 +545,7 @@ async function ensureSession(sessionId?: string) {
       chatSessionId = resp.data.sessionId
       // 会话建立后注册通用工具，让 LLM 可通过前端工具与用户交互
       await chatSession?.registerTool(askUserTool)
+      await chatSession?.registerTool(requireUserUpload)
       await chatSession?.registerTool(openLinkForUser)
       // 所有工具注册完成，通知 ensureSession 继续
       sessionReadyResolve?.()
@@ -609,9 +610,10 @@ async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || selectedModelId.value == null) return
 
-  // 如果在列表模式，自动开启新会话
+  // 如果在列表模式，自动开启新会话，并切换到 chat 模式防止后续消息再次触发
   if (viewMode.value === 'list') {
     startNewSession()
+    viewMode.value = 'chat'
   }
   // 如果历史面板打开，关闭它
   if (showHistoryPanel.value) {
