@@ -242,15 +242,27 @@
                   </VCardText>
                 </VCard>
               </VMenu>
-              <VBtn
-                :disabled="!inputText.trim() || selectedModelId == null"
-                color="primary"
-                size="40"
-                variant="flat"
-                @click="sendMessage"
-              >
-                <VIcon icon="mdi-arrow-up" />
-              </VBtn>
+              <template v-if="isWaitingForResponse">
+                <VBtn
+                  color="error"
+                  size="40"
+                  variant="text"
+                  @click="stopResponse"
+                >
+                  <VIcon icon="mdi-stop" />
+                </VBtn>
+              </template>
+              <template v-else>
+                <VBtn
+                  :disabled="!inputText.trim() || selectedModelId == null"
+                  color="primary"
+                  size="40"
+                  variant="flat"
+                  @click="sendMessage"
+                >
+                  <VIcon icon="mdi-arrow-up" />
+                </VBtn>
+              </template>
             </div>
           </div>
         </div>
@@ -276,6 +288,7 @@ const messages = ref<ChatMessage[]>([])
 const providersWithModels = ref<ProviderWithModelsVo[]>([])
 const selectedModelId = ref<number | null>(null)
 const conversationTitle = ref('AI 助手')
+const isWaitingForResponse = ref(false)
 const expandedThinking = ref(reactive({} as Record<number, boolean>))
 const expandedArgs = ref(reactive({} as Record<number, boolean>))
 
@@ -371,6 +384,7 @@ async function loadConversations() {
  * 断开当前 WebSocket 连接并重置会话状态。
  */
 function disconnectSession() {
+  isWaitingForResponse.value = false
   if (chatSession) {
     chatSession.close()
     chatSession = null
@@ -501,6 +515,7 @@ async function ensureSession(sessionId?: string) {
   })
 
   chatSession.onMessage(async resp => {
+    console.log(resp.type)
     if (resp.type == 'TEXT') {
       // 思考内容 或 正文响应
       const aiMsg = ensureAiMsg()
@@ -533,9 +548,11 @@ async function ensureSession(sessionId?: string) {
       }
     } else if (resp.type == 'ERROR') {
       // 出错
+      isWaitingForResponse.value = false
       SfcUtils.snackbar(resp.data.message)
     } else if (resp.type == 'DONE') {
       // LLM 完成响应
+      isWaitingForResponse.value = false
       const { modelId, time } = resp.data
       if (modelId != null && time != null) {
         messages.value.push({ role: 'done', modelId, time })
@@ -557,6 +574,7 @@ async function ensureSession(sessionId?: string) {
     }
   })
   chatSession.onClose(() => {
+    isWaitingForResponse.value = false
     const lastMsg = messages.value[messages.value.length - 1]
     console.log(lastMsg)
     
@@ -633,11 +651,20 @@ async function sendMessage() {
       modelId: selectedModelId.value!
     }
   })
+  isWaitingForResponse.value = true
   // 产生一条空AI回复以便在对话框中显示出来，让用户认为AI在等待
   ensureAiMsg()
 
   // 等待 DOM 更新后滚动到底部
   nextTick(scrollToBottom)
+}
+
+/**
+ * 停止当前 AI 响应：发送 STOP 消息并重置等待状态。
+ */
+function stopResponse() {
+  chatSession?.stop()
+  isWaitingForResponse.value = false
 }
 </script>
 
