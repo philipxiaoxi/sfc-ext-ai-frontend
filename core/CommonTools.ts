@@ -23,6 +23,7 @@ import type { ToolRegistration } from './ChatProtocol'
 import { getContext, openFileDialog } from 'sfc-common'
 import { DefaultFileSystemHandler } from 'sfc-common'
 import { ref } from 'vue'
+import { EventNameConstants } from 'sfc-common/core/constans/EventName'
 
 /**
  * ask_user 工具：当 LLM 需要用户决策或确认时，向用户提问并收集回答。
@@ -216,5 +217,34 @@ export const gotoDiskPath: ToolRegistration = {
     const routePath = path && path !== '/' ? StringUtils.appendPath(base, path) : base
     router.push(routePath)
     return JSON.stringify({ success: true, message: `已导航到 ${routePath}` })
+  }
+}
+
+/**
+ * refresh_file_list 工具：刷新当前网盘路径下的文件列表。
+ *
+ * 触发当前所在网盘页面的文件列表刷新，适用于 AI 执行了文件操作后需要刷新列表的场景。
+ *
+ * - 可选参数 `path`：指定需要刷新的路径，只有当前路径匹配时才刷新；不传则始终刷新
+ * - 路径比较前会做归一化（移除末尾 `/`、折叠连续的 `//`）
+ * - 通过事件总线通知当前网盘浏览器刷新文件列表
+ * - 返回刷新结果描述
+ */
+export const refreshFileList: ToolRegistration = {
+  name: 'refresh_file_list',
+  description: '刷新当前网盘路径下的文件列表，适用于AI执行了文件操作后需要刷新列表的场景',
+  parameters: {
+    type: 'object',
+    properties: {
+      path: {
+        type: 'string',
+        description: '可选，指定需要刷新的网盘路径（以/开头）。传此参数时仅当当前所在路径匹配时才执行刷新；不传则始终刷新当前路径'
+      }
+    }
+  },
+  handler: async(args) => {
+    const path: string | undefined = args.path
+    getContext().eventBus.value.emit(EventNameConstants.REFRESH_FILE_LIST, { path })
+    return JSON.stringify({ success: true, message: '已刷新文件列表' })
   }
 }
