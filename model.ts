@@ -19,8 +19,17 @@ export type ToolMessage = {
   /** 调用结果（TOOL_CALL_START 时不存在，TOOL_CALL_END 时设置） */
   result?: string
 
-  /** 工具调用状态：pending 进行中，done 已完成 */
-  status: 'pending' | 'done'
+  /**
+   * 工具调用状态：
+   * - `pending` — 进行中
+   * - `SUCCESS` — 执行成功
+   * - `ERROR` — 执行失败，见 {@link errorMessage}
+   * - `CANCELLED` — 被用户中断
+   */
+  status: 'pending' | 'SUCCESS' | 'ERROR' | 'CANCELLED'
+
+  /** 错误信息（`ERROR` 或 `CANCELLED` 时有值） */
+  errorMessage?: string
 }
 
 /** 对话消息 */
@@ -40,6 +49,8 @@ export type DoneInfo = {
   modelId: IdType
   /** 调用耗时（毫秒） */
   time: number
+  /** 停止原因：'已完成' | '已停止' */
+  reason?: string
 }
 
 /** 聊天请求体 */
@@ -137,8 +148,10 @@ export interface HistoryMessageVo {
   arguments?: string
   /** 工具执行结果（tool） */
   result?: string
-  /** 工具调用状态：pending / done（tool） */
+  /** 工具调用状态：pending / done / SUCCESS / ERROR / CANCELLED（tool） */
   status?: string
+  /** 错误信息（tool，ERROR 或 CANCELLED 时有值） */
+  errorMessage?: string
 }
 
 /** LLM 模型 */

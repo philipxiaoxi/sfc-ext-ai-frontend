@@ -123,6 +123,17 @@ export interface ToolCallEndPayload {
 
   /** 工具执行结果 */
   result: string
+
+  /**
+   * 工具调用执行状态。
+   * - `SUCCESS` — 执行成功
+   * - `ERROR` — 执行失败，见 {@link errorMessage}
+   * - `CANCELLED` — 被用户中断
+   */
+  status: 'SUCCESS' | 'ERROR' | 'CANCELLED'
+
+  /** 错误信息（`ERROR` 或 `CANCELLED` 时有值） */
+  errorMessage?: string
 }
 
 /**

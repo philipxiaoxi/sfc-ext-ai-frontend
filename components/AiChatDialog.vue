@@ -107,6 +107,7 @@
                   />
                   <VIcon icon="mdi-wrench-outline" class="mr-1" size="14" />
                   <span class="mr-1">{{ msg.name }}</span>
+                  <!-- 进行中：旋转加载图标 -->
                   <VIcon
                     v-if="msg.status === 'pending'"
                     icon="mdi-loading mdi-spin"
@@ -114,16 +115,44 @@
                     class="mr-2"
                     size="14"
                   />
-                  <span v-if="msg.result !== undefined" class="ml-1">✓</span>
+                  <!-- 成功：绿色对号 -->
+                  <VIcon
+                    v-else-if="msg.status === 'SUCCESS'"
+                    icon="mdi-check-circle"
+                    color="success"
+                    class="mr-2"
+                    size="14"
+                  />
+                  <!-- 失败：红色警告 -->
+                  <VIcon
+                    v-else-if="msg.status === 'ERROR'"
+                    icon="mdi-alert-circle"
+                    color="error"
+                    class="mr-2"
+                    size="14"
+                  />
+                  <!-- 中断：灰色停止 -->
+                  <VIcon
+                    v-else-if="msg.status === 'CANCELLED'"
+                    icon="mdi-cancel"
+                    color="disabled"
+                    class="mr-2"
+                    size="14"
+                  />
                 </div>
                 <div v-show="expandedArgs[i]" class="mt-1">
-                  <pre class="tool-args-pre tip pa-2 ma-0">IN: {{ msg.arguments }} <br>OUT: {{ msg.result }}</pre>
+                  <pre class="tool-args-pre tip pa-2 ma-0">IN: {{ msg.arguments }} <br>OUT: {{ msg.result || msg.errorMessage || '(无返回)' }}</pre>
                 </div>
               </div>
 
               <!-- DONE 信息 -->
               <div v-else-if="msg.role === 'done'" class="d-flex justify-center ml-12">
-                <span class="tip" style="font-size: 12px;">{{ msg.modelId }} · {{ formatElapsedTime(msg.time) }}</span>
+                <span class="tip" style="font-size: 12px;">
+                  {{ msg.modelId }} · {{ formatElapsedTime(msg.time) }}
+                  <template v-if="msg.reason">
+                    · {{ msg.reason }}
+                  </template>
+                </span>
               </div>
 
               <!-- AI助手 或 用户对话内容消息 -->
@@ -430,7 +459,8 @@ async function enterConversation(conv: AiConversation) {
             name: histMsg.name!,
             arguments: histMsg.arguments!,
             result: histMsg.result,
-            status: histMsg.status === 'pending' ? 'pending' : 'done'
+            errorMessage: histMsg.errorMessage,
+            status: (histMsg.status as ToolMessage['status']) || 'CANCELLED'
           })
         }
       }
@@ -538,13 +568,14 @@ async function ensureSession(sessionId?: string) {
       const payload = resp.data
       messages.value.push({ role: 'tool', id: payload.id, name: payload.name, arguments: payload.arguments, status: 'pending' })
     } else if (resp.type == 'TOOL_CALL_END') {
-      // 通知工具调用完成
+      // 通知工具调用完成（含 status 区分成功/失败/中断）
       const payload = resp.data
       const idx = messages.value.findIndex(m => m.role === 'tool' && m.id === payload.id)
       if (idx >= 0) {
         const msg = messages.value[idx] as ToolMessage
         msg.result = payload.result
-        msg.status = 'done'
+        msg.errorMessage = payload.errorMessage
+        msg.status = payload.status
       }
     } else if (resp.type == 'ERROR') {
       // 出错
@@ -553,9 +584,9 @@ async function ensureSession(sessionId?: string) {
     } else if (resp.type == 'DONE') {
       // LLM 完成响应
       isWaitingForResponse.value = false
-      const { modelId, time } = resp.data
+      const { modelId, time, reason } = resp.data
       if (modelId != null && time != null) {
-        messages.value.push({ role: 'done', modelId, time })
+        messages.value.push({ role: 'done', modelId, time, reason })
       }
     } else if (resp.type == 'SESSION_ACK') {
       // 会话建立确认
