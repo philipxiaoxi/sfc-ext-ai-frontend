@@ -7,16 +7,18 @@
  *
  * 使用方式：
  * ```ts
- * import { askUserTool, openLinkForLinkTool } from '../core/CommonTools'
+ * import { askUserTool, openLinkForLinkTool, getCurrentUserPath } from '../core/CommonTools'
  *
  * session.registerTool(askUserTool)
  * session.registerTool(openLinkForLinkTool)
+ * session.registerTool(getCurrentUserPath)
  * ```
  *
  * @see AiChatSession.registerTool
  */
 
 import SfcUtils from 'sfc-common/utils/SfcUtils'
+import { StringUtils } from 'sfc-common/utils/StringUtils'
 import type { ToolRegistration } from './ChatProtocol'
 import { getContext, openFileDialog } from 'sfc-common'
 import { DefaultFileSystemHandler } from 'sfc-common'
@@ -138,5 +140,81 @@ export const openLinkForUser: ToolRegistration = {
     } catch {
       return JSON.stringify({ success: false, message: '用户取消了打开链接' })
     }
+  }
+}
+
+/**
+ * get_current_user_path 工具：获取当前用户在网盘中的位置信息。
+ *
+ * 返回内容：
+ * - `diskArea`：网盘区域，`'public'` 表示公共网盘、`'private'` 表示私人网盘、`'不在网盘路径中'` 表示当前不在网盘浏览页面
+ * - `diskPath`：当前所在网盘路径（以 `/` 开头），当不在网盘路径中时为空字符串
+ */
+export const getCurrentUserPath: ToolRegistration = {
+  name: 'get_current_user_path',
+  description: '获取当前用户在网盘中的位置信息，包括所在的网盘区域（公共网盘/私人网盘）和路径',
+  parameters: {
+    type: 'object',
+    properties: {}
+  },
+  handler: async() => {
+    const route = getContext().routeInfo.value.curr
+    if (!route) {
+      return JSON.stringify({ diskArea: '不在网盘路径中', diskPath: '' })
+    }
+    const path = route.path
+    let diskArea = '不在网盘路径中'
+    let diskPath = ''
+
+    if (path === '/public' || path.startsWith('/public/')) {
+      diskArea = 'public'
+      diskPath = path === '/public' ? '/' : path.substring('/public'.length)
+    } else if (path === '/private' || path.startsWith('/private/')) {
+      diskArea = 'private'
+      diskPath = path === '/private' ? '/' : path.substring('/private'.length)
+    }
+    return JSON.stringify({ diskArea, diskPath })
+  }
+}
+
+/**
+ * goto_disk_path 工具：切换当前用户在网盘中的路径。
+ *
+ * 接受网盘区域和路径参数，调用 Vue Router 导航到对应路由。
+ * - 参数 `disk`：网盘区域，`"public"` 表示公共网盘，`"private"` 表示私人网盘
+ * - 参数 `path`：网盘路径，以 `/` 开头和作为路径分隔符，`"/"` 表示根目录
+ */
+export const gotoDiskPath: ToolRegistration = {
+  name: 'goto_disk_path',
+  description: '切换当前用户在网盘中的路径，导航到指定的网盘区域和目录。该工具需要流程或用户主动要求时调用。认为需要调用时可询问用户是否需要切换路径。',
+  parameters: {
+    type: 'object',
+    properties: {
+      disk: {
+        type: 'string',
+        description: '网盘区域，"public"表示公共网盘，"private"表示私人网盘'
+      },
+      path: {
+        type: 'string',
+        description: '网盘路径，以/作为开头和路径分隔符，如"/"表示根目录'
+      }
+    },
+    required: ['disk', 'path']
+  },
+  handler: async(args) => {
+    const disk: string = args.disk
+    const path: string = args.path
+    if (disk !== 'public' && disk !== 'private') {
+      return JSON.stringify({ error: 'disk 参数必须是 "public" 或 "private"' })
+    }
+    const router = getContext().routeInfo.value.router
+    if (!router) {
+      return JSON.stringify({ error: '路由实例不可用' })
+    }
+    // 构建路由路径：根路径为 /public 或 /private，子路径使用 appendPath 拼接
+    const base = '/' + disk
+    const routePath = path && path !== '/' ? StringUtils.appendPath(base, path) : base
+    router.push(routePath)
+    return JSON.stringify({ success: true, message: `已导航到 ${routePath}` })
   }
 }
