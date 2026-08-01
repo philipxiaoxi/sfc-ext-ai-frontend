@@ -14,7 +14,7 @@ import { IdType } from 'sfc-common/model'
 // ────────────────────────── 用户消息类型 ──────────────────────────
 
 /** 用户消息类型枚举（对应后端 UserMessageType） */
-export type UserMessageType = 'START_SESSION' | 'CHAT' | 'TOOL_ACK' | 'STOP' | 'REGISTER_TOOL'
+export type UserMessageType = 'START_SESSION' | 'CHAT' | 'TOOL_ACK' | 'STOP' | 'REGISTER_TOOL' | 'APPROVE' | 'SWITCH_MODE'
 
 // ────────────────────────── 服务端消息类型 ──────────────────────────
 
@@ -32,6 +32,7 @@ export type LlmMessageType =
   | 'ERROR'
   | 'TITLE_UPDATE'
   | 'REGISTER_TOOL_ACK'
+  | 'PERMISSION_REQUEST'
 
 // ────────────────────────── 请求 Payload ──────────────────────────
 
@@ -214,6 +215,33 @@ export interface ToolAckPayload {
   result: string
 }
 
+// ────────────────────────── 权限审批 Payload ──────────────────────────
+
+/** PERMISSION_REQUEST 消息 payload */
+export interface PermissionRequestPayload {
+  /** 工具调用 ID，用于关联 APPROVE 响应 */
+  toolCallId: string
+  /** 工具名称 */
+  toolName: string
+  /** 用途说明 */
+  purpose: string
+  /** 工具参数 */
+  arguments: Record<string, any>
+}
+
+/** APPROVE 消息 payload */
+export interface ApprovePayload {
+  /** 工具调用 ID，对应 PERMISSION_REQUEST 的 toolCallId */
+  toolCallId: string
+  /** true 表示批准，false 表示拒绝 */
+  approved: boolean
+}
+
+/** SWITCH_MODE 消息 payload */
+export interface SwitchModePayload {
+  /** 授权模式：NORMAL（普通授权）| FULL（完全授权） */
+  mode: 'NORMAL' | 'FULL'
+}
 
 // ────────────────────────── 请求消息（客户端 → 服务端） ──────────────────────────
 
@@ -232,6 +260,8 @@ export type ChatRequest =
   | { type: 'TOOL_ACK'; data: ToolAckPayload }
   | { type: 'STOP' }
   | { type: 'REGISTER_TOOL'; data: RegisterToolPayload }
+  | { type: 'APPROVE'; data: ApprovePayload }
+  | { type: 'SWITCH_MODE'; data: SwitchModePayload }
 
 // ────────────────────────── 响应消息（服务端 → 客户端） ──────────────────────────
 
@@ -258,3 +288,4 @@ export type LlmResponse =
   | { type: 'DONE'; data: DonePayload }
   | { type: 'ERROR'; data: ErrorPayload }
   | { type: 'TITLE_UPDATE'; data: TitleUpdatePayload }
+  | { type: 'PERMISSION_REQUEST'; data: PermissionRequestPayload }

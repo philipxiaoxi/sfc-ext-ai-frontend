@@ -201,6 +201,47 @@
               </div>
             </div>
 
+            <!-- 待审批权限卡片 -->
+            <div v-if="pendingPermissions.length > 0" class="px-2 pb-2">
+              <div class="text-caption font-weight-medium text-medium-emphasis mb-2">
+                <VIcon icon="mdi-shield-alert" size="14" class="mr-1" />
+                待审批操作
+              </div>
+              <div
+                v-for="req in pendingPermissions"
+                :key="req.toolCallId"
+                class="permission-request-card pa-3 mb-2"
+              >
+                <div class="d-flex align-center mb-1">
+                  <VIcon icon="mdi-wrench-outline" size="16" class="mr-1" />
+                  <span class="text-body-2 font-weight-medium">{{ req.toolName }}</span>
+                </div>
+                <div class="text-caption text-medium-emphasis mb-2">
+                  {{ req.purpose }}
+                </div>
+                <div class="d-flex ga-2">
+                  <VBtn
+                    size="small"
+                    color="success"
+                    variant="tonal"
+                    prepend-icon="mdi-check"
+                    @click="approvePermission(req.toolCallId)"
+                  >
+                    批准
+                  </VBtn>
+                  <VBtn
+                    size="small"
+                    color="error"
+                    variant="tonal"
+                    prepend-icon="mdi-close"
+                    @click="rejectPermission(req.toolCallId)"
+                  >
+                    拒绝
+                  </VBtn>
+                </div>
+              </div>
+            </div>
+
             <!-- 历史会话面板浮层（chat 模式下覆盖显示） -->
             <div
               v-if="viewMode === 'chat' && showHistoryPanel"
@@ -267,6 +308,17 @@
                       density="compact"
                       variant="outlined"
                       hide-details
+                      class="mb-3"
+                    />
+                    <VSelect
+                      v-model="authMode"
+                      :items="authModeOptions"
+                      item-title="label"
+                      item-value="value"
+                      label="授权模式"
+                      density="compact"
+                      variant="outlined"
+                      hide-details
                     />
                   </VCardText>
                 </VCard>
@@ -302,7 +354,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive, nextTick } from 'vue'
-import type { ChatMessage, ToolMessage, ProviderWithModelsVo, AiConversation, ConversationHistoryVo } from '../model'
+import type { ChatMessage, ToolMessage, ProviderWithModelsVo, AiConversation, ConversationHistoryVo, PermissionRequest } from '../model'
 import { MarkdownView, UserAvatar } from 'sfc-common/components'
 import ConversationList from './ConversationList.vue'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
@@ -331,6 +383,18 @@ const activeConversationId = ref<string | null>(null)
 const conversations = ref<AiConversation[]>([])
 /** 对话列表是否正在加载 */
 const conversationsLoading = ref(false)
+
+/** 待审批的权限请求列表 */
+const pendingPermissions = ref<PermissionRequest[]>([])
+
+/** 当前授权模式 */
+const authMode = ref<'NORMAL' | 'FULL'>('NORMAL')
+
+/** 授权模式选项 */
+const authModeOptions = [
+  { label: '普通授权', value: 'NORMAL' },
+  { label: '完全授权', value: 'FULL' }
+]
 
 function toggleThinking(index: number) {
   expandedThinking.value[index] = !expandedThinking.value[index]
@@ -414,6 +478,7 @@ async function loadConversations() {
  */
 function disconnectSession() {
   isWaitingForResponse.value = false
+  pendingPermissions.value = []
   if (chatSession) {
     chatSession.close()
     chatSession = null
@@ -577,6 +642,14 @@ async function ensureSession(sessionId?: string) {
         msg.errorMessage = payload.errorMessage
         msg.status = payload.status
       }
+    } else if (resp.type == 'PERMISSION_REQUEST') {
+      // 收到权限审批请求
+      pendingPermissions.value.push({
+        toolCallId: resp.data.toolCallId,
+        toolName: resp.data.toolName,
+        purpose: resp.data.purpose,
+        arguments: resp.data.arguments
+      })
     } else if (resp.type == 'ERROR') {
       // 出错
       isWaitingForResponse.value = false
@@ -600,6 +673,10 @@ async function ensureSession(sessionId?: string) {
       await chatSession?.registerTool(refreshFileList)
       // 所有工具注册完成，通知 ensureSession 继续
       sessionReadyResolve?.()
+      // 若用户选择了完全授权模式，连接建立后立即切换
+      if (authMode.value === 'FULL') {
+        chatSession?.send({ type: 'SWITCH_MODE', data: { mode: 'FULL' } })
+      }
     } else if (resp.type == 'TITLE_UPDATE') {
       // 收到标题更新消息，匹配当前会话则更新显示的标题
       if (resp.data.conversationId === chatSessionId) {
@@ -608,14 +685,17 @@ async function ensureSession(sessionId?: string) {
     }
   })
   chatSession.onClose(() => {
+    // 先置空会话，避免下方 authMode 重置触发 watcher 向已关闭的连接发送 SWITCH_MODE
+    chatSession = null
     isWaitingForResponse.value = false
+    pendingPermissions.value = []
+    authMode.value = 'NORMAL'
     const lastMsg = messages.value[messages.value.length - 1]
     console.log(lastMsg)
     
     if (!lastMsg || lastMsg.role !== 'done') {
       SfcUtils.alert('AI 聊天连接已断开')
     }
-    chatSession = null
   })
 
   // 发送 START_SESSION 开启会话，若提供了 sessionId 则恢复已有会话
@@ -646,6 +726,14 @@ watch(drawerOpen, (open) => {
   const el = document.querySelector('main')
   if (el) {
     el.style.setProperty('padding-right', open ? '480px' : '')
+  }
+})
+
+// 用户切换授权模式时，若会话已建立则立即发送 SWITCH_MODE 报文
+// （会话未建立时，由 SESSION_ACK 处理逻辑在建立后按当前模式发送）
+watch(authMode, (mode) => {
+  if (chatSession) {
+    chatSession.send({ type: 'SWITCH_MODE', data: { mode } })
   }
 })
 
@@ -699,6 +787,24 @@ async function sendMessage() {
 function stopResponse() {
   chatSession?.stop()
   isWaitingForResponse.value = false
+}
+
+/**
+ * 批准工具调用权限。
+ * 发送 APPROVE 消息并立即从待审批列表中移除该请求。
+ */
+function approvePermission(toolCallId: string) {
+  chatSession?.send({ type: 'APPROVE', data: { toolCallId, approved: true } })
+  pendingPermissions.value = pendingPermissions.value.filter(p => p.toolCallId !== toolCallId)
+}
+
+/**
+ * 拒绝工具调用权限。
+ * 发送 APPROVE（approved: false）消息并立即从待审批列表中移除该请求。
+ */
+function rejectPermission(toolCallId: string) {
+  chatSession?.send({ type: 'APPROVE', data: { toolCallId, approved: false } })
+  pendingPermissions.value = pendingPermissions.value.filter(p => p.toolCallId !== toolCallId)
 }
 </script>
 
@@ -822,6 +928,14 @@ export default defineComponent({
   max-height: 160px;
   overflow: auto;
   font-size: 10px;
+}
+
+/* ────────── 权限审批卡片 ────────── */
+
+.permission-request-card {
+  background-color: rgba(var(--v-theme-warning), 0.08);
+  border: 1px solid rgba(var(--v-theme-warning), 0.25);
+  border-radius: 8px;
 }
 
 /* ────────── 历史会话面板浮层 ────────── */

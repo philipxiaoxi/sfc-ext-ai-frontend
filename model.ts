@@ -154,6 +154,18 @@ export interface HistoryMessageVo {
   errorMessage?: string
 }
 
+/** 权限审批请求（UI 显示用） */
+export interface PermissionRequest {
+  /** 工具调用 ID */
+  toolCallId: string
+  /** 工具名称 */
+  toolName: string
+  /** 用途说明 */
+  purpose: string
+  /** 工具参数 */
+  arguments: Record<string, any>
+}
+
 /** LLM 模型 */
 export interface LlmModel {
   /** 主键 ID */
