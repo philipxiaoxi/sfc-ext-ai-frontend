@@ -1,7 +1,7 @@
 import type { IdType } from 'sfc-common/model'
 
 /** 聊天消息 */
-export type ChatMessage = ToolMessage | TextMessage | DoneInfo
+export type ChatMessage = ToolMessage | TextMessage | DoneInfo | SystemMessage
 
 /** 工具消息 */
 export type ToolMessage = {
@@ -51,6 +51,13 @@ export type DoneInfo = {
   time: number
   /** 停止原因：'已完成' | '已停止' */
   reason?: string
+}
+
+/** 系统提示消息（如授权模式切换确认） */
+export type SystemMessage = {
+  role: 'system'
+  /** 提示内容，如 "授权模式已切换为: 完全授权" */
+  content: string
 }
 
 /** 聊天请求体 */

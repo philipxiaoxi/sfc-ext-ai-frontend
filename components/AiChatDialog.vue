@@ -78,7 +78,7 @@
               :class="['d-flex ga-3 mb-4', msg.role === 'user' ? 'flex-row-reverse' : '']"
             >
               <!-- 显示 AI助手 或 用户 的聊天头像 -->
-              <div v-if="msg.role !== 'tool' && msg.role !== 'done'" class="message-avatar flex-shrink-0">
+              <div v-if="msg.role !== 'tool' && msg.role !== 'done' && msg.role !== 'system'" class="message-avatar flex-shrink-0">
                 <UserAvatar
                   v-if="msg.role == 'user'"
                   :size="32"
@@ -155,9 +155,17 @@
                 </span>
               </div>
 
+              <!-- 系统提示消息（如授权模式切换确认） -->
+              <div v-else-if="msg.role === 'system'" class="d-flex justify-center ml-12">
+                <span class="system-message-tip">
+                  <VIcon icon="mdi-shield-account-outline" size="12" />
+                  {{ msg.content }}
+                </span>
+              </div>
+
               <!-- AI助手 或 用户对话内容消息 -->
               <div
-                v-if="msg.role !== 'tool' && msg.role !== 'done'"
+                v-if="msg.role !== 'tool' && msg.role !== 'done' && msg.role !== 'system'"
                 :class="[
                   'message-bubble px-4 py-2',
                   msg.role === 'user'
@@ -682,6 +690,17 @@ async function ensureSession(sessionId?: string) {
       if (resp.data.conversationId === chatSessionId) {
         conversationTitle.value = resp.data.title
       }
+    } else if (resp.type == 'MODE_SWITCHED') {
+      // 收到授权模式切换确认：将本地授权模式与服务端同步，并在对话框中展示切换提示
+      // data.content 形如 "授权模式已切换为: 完全授权" / "授权模式已切换为: 普通授权"
+      const content = resp.data.content
+      if (content == null) return
+      isSyncingAuthMode = true
+      authMode.value = content.includes('完全授权') ? 'FULL' : 'NORMAL'
+      isSyncingAuthMode = false
+      // 以系统消息形式在对话消息列表中体现授权模式切换
+      messages.value.push({ role: 'system', content })
+      nextTick(scrollToBottom)
     }
   })
   chatSession.onClose(() => {
@@ -729,9 +748,13 @@ watch(drawerOpen, (open) => {
   }
 })
 
+// 标记位：正在同步服务端确认的授权模式，避免 watcher 向服务端重复发送 SWITCH_MODE
+let isSyncingAuthMode = false
+
 // 用户切换授权模式时，若会话已建立则立即发送 SWITCH_MODE 报文
 // （会话未建立时，由 SESSION_ACK 处理逻辑在建立后按当前模式发送）
 watch(authMode, (mode) => {
+  if (isSyncingAuthMode) return
   if (chatSession) {
     chatSession.send({ type: 'SWITCH_MODE', data: { mode } })
   }
@@ -928,6 +951,21 @@ export default defineComponent({
   max-height: 160px;
   overflow: auto;
   font-size: 10px;
+}
+
+/* ────────── 系统提示消息（如授权模式切换确认） ────────── */
+
+.system-message-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  background-color: rgba(var(--v-theme-on-surface), 0.05);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border-radius: 12px;
+  padding: 2px 10px;
 }
 
 /* ────────── 权限审批卡片 ────────── */

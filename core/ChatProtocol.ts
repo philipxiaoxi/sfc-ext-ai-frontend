@@ -33,6 +33,7 @@ export type LlmMessageType =
   | 'TITLE_UPDATE'
   | 'REGISTER_TOOL_ACK'
   | 'PERMISSION_REQUEST'
+  | 'MODE_SWITCHED'
 
 // ────────────────────────── 请求 Payload ──────────────────────────
 
@@ -289,3 +290,4 @@ export type LlmResponse =
   | { type: 'ERROR'; data: ErrorPayload }
   | { type: 'TITLE_UPDATE'; data: TitleUpdatePayload }
   | { type: 'PERMISSION_REQUEST'; data: PermissionRequestPayload }
+  | { type: 'MODE_SWITCHED'; data: TextPayload }
