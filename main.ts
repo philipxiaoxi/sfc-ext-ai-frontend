@@ -1,11 +1,13 @@
 import SfcUtils from 'sfc-common/utils/SfcUtils/index.js'
 import AiChatDialog from './components/AiChatDialog.vue'
 import LlmProviderManager from './components/LlmProviderManager.vue'
+import SensitiveToolCallRecord from './components/SensitiveToolCallRecord.vue'
 
 window.bootContext.addProcessor({
   taskName: '注册AI助手',
   execute(app) {
     app.component(LlmProviderManager.name as string, LlmProviderManager)
+    app.component(SensitiveToolCallRecord.name as string, SensitiveToolCallRecord)
   },
   onFinish() {
     SfcUtils.dyncmount(AiChatDialog, {

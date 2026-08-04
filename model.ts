@@ -186,4 +186,51 @@ export interface LlmModel {
   updateAt?: Date
 }
 
+/** 敏感工具调用状态（对应后端 SensitiveToolCallStatus 枚举） */
+export type SensitiveToolCallStatus = 'AUTO_EXECUTED' | 'APPROVED_EXECUTED' | 'REJECTED'
+
+/** 敏感工具调用记录（对应后端 SensitiveToolCallRecord PO） */
+export interface SensitiveToolCallRecord {
+  /** 主键 ID */
+  id?: number
+  /** 发起调用的用户 ID */
+  uid?: number
+  /** 发起调用的用户名 */
+  username?: string
+  /** 发起调用的 AI 会话 ID */
+  conversationId?: string
+  /** 敏感工具名称 */
+  toolName: string
+  /** 工具用途说明 */
+  purpose?: string
+  /** 工具调用参数（JSON 字符串） */
+  arguments?: string
+  /** 调用状态：AUTO_EXECUTED 自动执行 / APPROVED_EXECUTED 批准执行 / REJECTED 已拒绝 */
+  status: SensitiveToolCallStatus
+  /** 是否执行成功（REJECTED 恒为 false） */
+  success?: boolean
+  /** 工具执行结果或错误信息 */
+  result?: string
+  /** 创建时间 */
+  createAt?: string | number
+  /** 更新时间 */
+  updateAt?: string | number
+}
+
+/** 敏感工具调用记录分页查询参数 */
+export interface SensitiveToolCallQueryParam {
+  /** 页码，从 0 开始 */
+  page?: number
+  /** 每页大小 */
+  size?: number
+  /** 用户 ID 筛选（可选） */
+  uid?: number
+  /** 工具名称模糊筛选（可选） */
+  toolName?: string
+  /** 开始时间（毫秒时间戳，可选） */
+  startTime?: number
+  /** 结束时间（毫秒时间戳，可选） */
+  endTime?: number
+}
+
 

@@ -1,5 +1,5 @@
-import { CommonRequest } from 'sfc-common/model'
-import type { AdapterInfo, AiConversation, ConversationHistoryVo, LlmModel, LlmProvider, ProviderWithModelsVo } from './model'
+import { CommonPageInfo, CommonRequest } from 'sfc-common/model'
+import type { AdapterInfo, AiConversation, ConversationHistoryVo, LlmModel, LlmProvider, ProviderWithModelsVo, SensitiveToolCallQueryParam, SensitiveToolCallRecord } from './model'
 
 // ────────────────────────── LLM 适配器 API ──────────────────────────
 
@@ -187,6 +187,26 @@ export namespace QueryApi {
     return {
       url: `${queryPrefix}/providersWithModels`,
       method: 'get'
+    }
+  }
+}
+
+// ────────────────────────── 敏感工具调用记录 API ──────────────────────────
+
+/** 敏感工具调用记录 API 前缀 */
+const sensitiveToolCallPrefix = '/ai/sensitiveToolCall'
+
+/** 敏感工具调用记录相关 API（管理员） */
+export namespace SensitiveToolCallRecordApi {
+  /**
+   * 分页查询敏感工具调用记录
+   * @param param 查询参数（支持按 uid、工具名称、时间范围筛选）
+   */
+  export function getRecords(param: SensitiveToolCallQueryParam): CommonRequest<CommonPageInfo<SensitiveToolCallRecord>> {
+    return {
+      url: `${sensitiveToolCallPrefix}/records`,
+      method: 'get',
+      params: param
     }
   }
 }
