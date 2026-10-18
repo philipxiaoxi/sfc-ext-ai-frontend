@@ -28,7 +28,7 @@
     <v-row>
       <v-col cols="12">
         <v-text-field
-          v-model="formData.reasoning"
+          v-model="formData.reasoningEffect"
           label="思考模式"
           placeholder="例如: max、low、none"
         />

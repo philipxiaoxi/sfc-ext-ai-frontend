@@ -319,7 +319,7 @@ class AiChatSessionImpl implements AiChatSession {
 export const aiChatService: AiChatService = {
   async connect(url?: string): Promise<AiChatSession> {
     const ws = await WebSocketService.createNativeWebSocket({
-      url: url ?? '/api/ai/wschat',
+      url: url ?? '/api/service/sfc-ai-service/ai/wschat',
       onError(e) {
         console.error('[AiChatService] WebSocket 连接失败:', e)
       }

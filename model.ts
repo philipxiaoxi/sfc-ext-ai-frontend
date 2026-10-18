@@ -186,7 +186,7 @@ export interface LlmModel {
   /** 最大上下文长度 */
   contextLength?: number
   /** 思考模式 */
-  reasoning?: string
+  reasoningEffect?: string
   /** 创建时间 */
   createAt?: Date
   /** 更新时间 */

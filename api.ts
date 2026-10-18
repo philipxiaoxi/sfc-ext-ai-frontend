@@ -4,7 +4,7 @@ import type { AdapterInfo, AiConversation, ConversationHistoryVo, LlmModel, LlmP
 // ────────────────────────── LLM 适配器 API ──────────────────────────
 
 /** 适配器 API 前缀 */
-const adapterPrefix = '/ai/adapter'
+const adapterPrefix = '/service/sfc-ai-service/ai/adapter'
 
 /** LLM 适配器相关 API */
 export namespace AdapterApi {
@@ -22,7 +22,7 @@ export namespace AdapterApi {
 // ────────────────────────── LLM 提供商 API ──────────────────────────
 
 /** 提供商 API 前缀 */
-const providerPrefix = '/ai/provider'
+const providerPrefix = '/service/sfc-ai-service/ai/provider'
 
 /** LLM 提供商相关 API */
 export namespace ProviderApi {
@@ -77,7 +77,7 @@ export namespace ProviderApi {
 // ────────────────────────── LLM 模型 API ──────────────────────────
 
 /** 模型 API 前缀 */
-const modelPrefix = '/ai/model'
+const modelPrefix = '/service/sfc-ai-service/ai/model'
 
 /** LLM 模型相关 API */
 export namespace ModelApi {
@@ -146,7 +146,7 @@ export namespace ModelApi {
 // ────────────────────────── AI 对话管理 API ──────────────────────────
 
 /** 对话 API 前缀 */
-const conversationPrefix = '/ai/conversation'
+const conversationPrefix = '/service/sfc-ai-service/ai/conversation'
 
 /** AI 对话管理相关 API */
 export namespace ConversationApi {
@@ -176,7 +176,7 @@ export namespace ConversationApi {
 // ────────────────────────── 组合查询 API ──────────────────────────
 
 /** 查询 API 前缀 */
-const queryPrefix = '/ai/query'
+const queryPrefix = '/service/sfc-ai-service/ai/query'
 
 /** 组合查询相关 API */
 export namespace QueryApi {
@@ -194,7 +194,7 @@ export namespace QueryApi {
 // ────────────────────────── 敏感工具调用记录 API ──────────────────────────
 
 /** 敏感工具调用记录 API 前缀 */
-const sensitiveToolCallPrefix = '/ai/sensitiveToolCall'
+const sensitiveToolCallPrefix = '/service/sfc-ai-service/ai/sensitiveToolCall'
 
 /** 敏感工具调用记录相关 API（管理员） */
 export namespace SensitiveToolCallRecordApi {
