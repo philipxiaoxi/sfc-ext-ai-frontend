@@ -20,55 +20,212 @@
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 import { StringUtils } from 'sfc-common/utils/StringUtils'
 import type { ToolRegistration } from './ChatProtocol'
+import AskUserDialog from '../components/AskUserDialog.vue'
 import { getContext, openFileDialog } from 'sfc-common'
 import { DefaultFileSystemHandler } from 'sfc-common'
 import { ref } from 'vue'
 import { EventNameConstants } from 'sfc-common/core/constans/EventName'
 
 /**
+ * ask_user 工具的可选项。
+ */
+export interface AskUserOption {
+  /** 选项标题（必填），用户选中后作为该问题的答案内容 */
+  title: string
+
+  /** 选项副标题/补充说明（可选），仅用于展示，不参与答案返回 */
+  subtitle?: string
+}
+
+/**
+ * ask_user 工具的单个问题。
+ */
+export interface AskUserQuestion {
+  /** 问题文本 */
+  question: string
+
+  /** 可选项列表（可选）。存在时用户可直接点选，对话框底部仍允许手动输入回答 */
+  options?: AskUserOption[]
+
+  /** 是否多选，默认 false。为 true 时该问题的答案返回字符串数组 */
+  multiSelect?: boolean
+}
+
+/**
+ * ask_user 工具单个问题的答案值。
+ *
+ * - 单选题：字符串（选中选项的 title 或用户手动输入的内容）
+ * - 多选题：字符串数组（所选选项 title 按选项顺序排列，手动输入内容追加在末尾）
+ */
+export type AskUserAnswerValue = string | string[]
+
+/**
+ * AskUserDialog 组件通过 defineExpose 暴露的对外方法。
+ */
+export interface AskUserDialogExposed {
+  /**
+   * 获取与 questions 下标一一对应的用户答案。
+   * @returns 每个问题的答案数组，元素类型见 {@link AskUserAnswerValue}
+   */
+  getAnswers: () => AskUserAnswerValue[]
+}
+
+/**
+ * 归一化 ask_user 工具收到的原始问题参数。
+ *
+ * - 兼容历史的纯字符串问题写法（自动包装为 {@link AskUserQuestion}）
+ * - 过滤缺少 question 文本的非法问题
+ * - 过滤缺少 title 的非法选项，`multiSelect` 缺省为 false
+ *
+ * @param rawQuestions LLM 传入的原始 questions 参数
+ * @returns 归一化后可直接用于渲染的问题列表
+ */
+function normalizeAskUserQuestions(rawQuestions: unknown): AskUserQuestion[] {
+  if (!Array.isArray(rawQuestions)) return []
+
+  const questions: AskUserQuestion[] = []
+  for (const raw of rawQuestions) {
+    // 兼容旧版的纯字符串问题写法
+    if (typeof raw === 'string') {
+      if (raw.trim()) questions.push({ question: raw })
+      continue
+    }
+    if (!raw || typeof raw !== 'object') continue
+
+    const item = raw as Record<string, any>
+    if (typeof item.question !== 'string' || !item.question.trim()) continue
+
+    // 过滤掉缺少 title 的非法选项，副标题仅在为字符串时保留
+    const options: AskUserOption[] = Array.isArray(item.options)
+      ? item.options
+        .filter((option: any) => option && typeof option === 'object' && typeof option.title === 'string' && option.title.trim())
+        .map((option: any) => ({
+          title: option.title as string,
+          subtitle: typeof option.subtitle === 'string' ? option.subtitle : undefined
+        }))
+      : []
+
+    questions.push({
+      question: item.question,
+      options: options.length > 0 ? options : undefined,
+      multiSelect: item.multiSelect === true
+    })
+  }
+  return questions
+}
+
+/**
+ * 将组件收集到的答案聚合为以问题文本为 key 的对象。
+ *
+ * - 多选题：答案始终为字符串数组（未作答时为 `[]`）
+ * - 单选题：答案始终为非空字符串（未作答时为 `用户未回答`）
+ *
+ * @param questions 归一化后的问题列表
+ * @param answers 与 questions 下标对应的答案数组
+ * @returns 以问题文本为 key 的答案聚合对象
+ */
+function buildAskUserAnswerMap(questions: AskUserQuestion[], answers: AskUserAnswerValue[]): Record<string, string | string[]> {
+  const answerMap: Record<string, string | string[]> = {}
+  questions.forEach((question, index) => {
+    const value = answers[index]
+    if (question.multiSelect) {
+      answerMap[question.question] = Array.isArray(value) ? value : []
+      return
+    }
+    answerMap[question.question] = typeof value === 'string' && value.trim() ? value : '用户未回答'
+  })
+  return answerMap
+}
+
+/**
  * ask_user 工具：当 LLM 需要用户决策或确认时，向用户提问并收集回答。
  *
- * - 参数 `questions`：问题字符串数组，依次弹出输入框
- * - 多问题时标题会显示 `(1/N)` 进度标识
- * - 返回 JSON 对象，key 为问题原文，value 为用户回答
+ * - 参数 `questions`：问题对象数组，所有问题统一展示在同一个弹窗中
+ * - 每个问题可选 `options`（选项含 title/subtitle，通过 VList 展示）和 `multiSelect`（默认 false）
+ * - 无论是否存在选项，每个问题底部都始终提供手动输入框
+ * - 返回 JSON 对象，key 为问题原文：单选答案为字符串，多选答案为字符串数组
  */
 export const askUserTool: ToolRegistration = {
   name: 'ask_user',
-  description: '当需要用户进行决策或确认时，向用户提出一个或多个问题并等待用户回答，或单纯用于询问用户',
+  description: '当需要用户进行决策或确认时，向用户提出一个或多个问题并等待用户回答，或单纯用于询问用户。每个问题可通过 options 提供选项（含 title 与 subtitle）让用户直接点选；multiSelect 为 true 时该问题支持多选，返回字符串数组（含所选选项标题以及用户手动输入的内容），否则返回字符串。',
   parameters: {
     type: 'object',
     properties: {
       questions: {
         type: 'array',
-        description: '向用户提问的问题列表，按顺序依次提问',
+        description: '向用户提问的问题列表，所有问题在同一个弹窗中依次展示',
         items: {
-          type: 'string'
+          type: 'object',
+          description: '单个问题及其可选项',
+          properties: {
+            question: {
+              type: 'string',
+              description: '问题文本'
+            },
+            options: {
+              type: 'array',
+              description: '可选：选项列表。提供后用户可直接点选，弹窗底部仍允许手动输入回答',
+              items: {
+                type: 'object',
+                properties: {
+                  title: {
+                    type: 'string',
+                    description: '选项标题'
+                  },
+                  subtitle: {
+                    type: 'string',
+                    description: '选项副标题/补充说明，可选，仅用于展示不参与答案'
+                  }
+                },
+                required: ['title']
+              }
+            },
+            multiSelect: {
+              type: 'boolean',
+              description: '可选：是否允许多选，默认 false。为 true 时该问题答案返回字符串数组'
+            }
+          },
+          required: ['question']
         }
       }
     },
     required: ['questions']
   },
   handler: async(args) => {
-    const questions: string[] = args.questions ?? []
-    const answers: Record<string, string> = {}
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i]
-      let title = 'AI 助手需要确认'
-      if (questions.length > 1) {
-        title += ` (${i + 1}/${questions.length})`
-      }
-      const answer = await SfcUtils.prompt({
-        title,
-        label: q,
-        autofocus: true,
-        extraDialogOptions: {
-          persistent: true
-        },
-        cancelToReject: false
-      })
-      answers[q] = answer || '用户未回答'
+    // 1) 归一化 LLM 传入的问题参数
+    const questions = normalizeAskUserQuestions(args?.questions)
+    if (questions.length === 0) {
+      return JSON.stringify({})
     }
-    return JSON.stringify(answers)
+
+    // 2) 打开专用组件对话框，统一收集所有问题的答案；取消视为全部未作答
+    const rawAnswers = await new Promise<AskUserAnswerValue[]>(resolve => {
+      const dialogInst = SfcUtils.openComponentDialog(AskUserDialog, {
+        title: questions.length > 1 ? `AI 助手需要确认（共 ${questions.length} 个问题）` : 'AI 助手需要确认',
+        props: { questions },
+        // 持久弹窗：不允许通过 ESC 或点击空白处关闭，必须明确提交或取消（与旧实现一致）
+        persistent: true,
+        contentMaxHeight: '70vh',
+        extraDialogOptions: {
+          maxWidth: '760px',
+          confirmText: '提交'
+        },
+        onConfirm() {
+          // 从组件读取按问题顺序排列的答案后关闭对话框
+          const inst = dialogInst.getComponentInstRef() as unknown as AskUserDialogExposed
+          resolve(inst.getAnswers())
+          return true
+        },
+        onCancel() {
+          // 取消时所有问题均视为未作答：单选用空字符串、多选用空数组占位
+          resolve(questions.map<AskUserAnswerValue>(question => question.multiSelect ? [] : ''))
+          return true
+        }
+      })
+    })
+
+    // 3) 按问题文本聚合答案并序列化返回
+    return JSON.stringify(buildAskUserAnswerMap(questions, rawAnswers))
   }
 }
 

@@ -149,6 +149,10 @@ export interface ToolParameterSchemaProperty {
   description?: string
   /** 当 type 为 'array' 时，描述数组元素的 schema */
   items?: ToolParameterSchemaProperty
+  /** 当 type 为 'object' 时，描述对象各字段的 schema */
+  properties?: Record<string, ToolParameterSchemaProperty>
+  /** 当 type 为 'object' 时，对象必填字段的名称列表 */
+  required?: string[]
 }
 
 export interface ToolParameterSchema {
