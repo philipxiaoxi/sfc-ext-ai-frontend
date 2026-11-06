@@ -97,7 +97,7 @@ import LlmProviderFormVue from './LlmProviderForm.vue'
 const props = defineProps({
   /** 用户 ID */
   uid: {
-    type: Number,
+    type: [Number, String],
     default: undefined
   }
 })

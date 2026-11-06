@@ -2,6 +2,8 @@ import SfcUtils from 'sfc-common/utils/SfcUtils/index.js'
 import AiChatDialog from './components/AiChatDialog.vue'
 import LlmProviderManager from './components/LlmProviderManager.vue'
 import SensitiveToolCallRecord from './components/SensitiveToolCallRecord.vue'
+import { ConditionFunction, getContext, MenuHelper } from 'sfc-common'
+import { h } from 'vue'
 
 window.bootContext.addProcessor({
   taskName: '注册AI助手',
@@ -15,6 +17,20 @@ window.bootContext.addProcessor({
         dom.style.width = '0'
         dom.style.height = '0'
         dom.style.overflow = 'visible'
+      },
+    })
+
+    MenuHelper.addMoreBoxMenu({
+      id: 'ai-llm-provider',
+      title: 'AI模型配置',
+      renderOn(ctx) {
+        return ConditionFunction.hasLogin(getContext())
+      },
+      action(ctx) {
+        ctx.title = 'AI模型配置'
+        ctx.currentComponent = h(LlmProviderManager, {
+          uid: getContext().session.value.user.id
+        })
       },
     })
   }
