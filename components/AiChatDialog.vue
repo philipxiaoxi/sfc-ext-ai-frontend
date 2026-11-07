@@ -368,7 +368,7 @@ import type { ChatMessage, ToolMessage, ProviderWithModelsVo, AiConversation, Co
 import { MarkdownView, UserAvatar, FloatingAction, FLOATING_ACTION_ORDER, APP_OVERLAY_ROOT_ID } from 'sfc-common/components'
 import ConversationList from './ConversationList.vue'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
-import { askUserTool, getCurrentUserPath, gotoDiskPath, openLinkForUser, refreshFileList, requireUserUpload } from '../core/CommonTools'
+import { askUserTool, getCurrentUserBrowserUrl, getCurrentUserPath, gotoDiskPath, openLinkForUser, refreshFileList, requireUserUpload } from '../core/CommonTools'
 import { QueryApi, ConversationApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 import { useAutoScroll } from '../composables/useAutoScroll'
@@ -682,6 +682,7 @@ async function ensureSession(sessionId?: string) {
       await chatSession?.registerTool(requireUserUpload)
       await chatSession?.registerTool(openLinkForUser)
       await chatSession?.registerTool(getCurrentUserPath)
+      await chatSession?.registerTool(getCurrentUserBrowserUrl)
       await chatSession?.registerTool(gotoDiskPath)
       await chatSession?.registerTool(refreshFileList)
       // 所有工具注册完成，通知 ensureSession 继续

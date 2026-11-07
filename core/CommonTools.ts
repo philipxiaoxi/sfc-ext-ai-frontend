@@ -301,6 +301,18 @@ export const openLinkForUser: ToolRegistration = {
   }
 }
 
+export const getCurrentUserBrowserUrl: ToolRegistration = {
+  name: 'get_current_user_browser_url',
+  description: '获取用户当前访问的浏览器地址',
+  parameters: {
+    type: 'object',
+    properties: {}
+  },
+  handler() {
+    return location.href
+  }
+}
+
 /**
  * get_current_user_path 工具：获取当前用户在网盘中的位置信息。
  *
