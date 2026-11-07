@@ -1,19 +1,20 @@
 <template>
   <div class="ai-chat-dialog">
-    <VBtn
-      class="ai-fab"
-      color="primary"
-      elevation="8"
-      icon="mdi-robot-outline"
-      size="56"
-      @click="drawerOpen = !drawerOpen"
-    />
+    <!-- AI 助手悬浮球统一挂载到主应用的全局悬浮操作区容器，由容器负责右下角排布，避免 fixed 定位遮挡页面级操作按钮 -->
+    <FloatingAction :order="FLOATING_ACTION_ORDER.GLOBAL">
+      <VFab
+        color="primary"
+        icon="mdi-robot-outline"
+        size="large"
+        @click="drawerOpen = !drawerOpen"
+      />
+    </FloatingAction>
 
-    <Teleport to="main">
+    <Teleport :to="`#${APP_OVERLAY_ROOT_ID}`">
       <v-navigation-drawer
         v-model="drawerOpen"
         location="right"
-        :width="480"
+        :width="DRAWER_WIDTH"
         class="chat-drawer"
       >
         <div class="d-flex flex-column h-100">
@@ -363,13 +364,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, Teleport, reactive, nextTick } from 'vue'
 import type { ChatMessage, ToolMessage, ProviderWithModelsVo, AiConversation, ConversationHistoryVo, PermissionRequest } from '../model'
-import { MarkdownView, UserAvatar } from 'sfc-common/components'
+// FloatingAction（全局悬浮操作项容器）、FLOATING_ACTION_ORDER（排序权重）、APP_OVERLAY_ROOT_ID（常驻覆盖层容器 id）均来自白名单路径 sfc-common/components
+import { MarkdownView, UserAvatar, FloatingAction, FLOATING_ACTION_ORDER, APP_OVERLAY_ROOT_ID } from 'sfc-common/components'
 import ConversationList from './ConversationList.vue'
 import { aiChatService, AiChatSession } from '../core/AiChatService'
 import { askUserTool, getCurrentUserPath, gotoDiskPath, openLinkForUser, refreshFileList, requireUserUpload } from '../core/CommonTools'
 import { QueryApi, ConversationApi } from '../api'
 import SfcUtils from 'sfc-common/utils/SfcUtils'
 import { useAutoScroll } from '../composables/useAutoScroll'
+
+/** AI 助手抽屉宽度（px）：抽屉本体宽度与打开时 main 的右侧留白共用该值，避免两处硬编码不一致 */
+const DRAWER_WIDTH = 480
 
 const drawerOpen = ref(false)
 const inputText = ref('')
@@ -741,11 +746,34 @@ function ensureAiMsg() {
   return aiMsg
 }
 
-watch(drawerOpen, (open) => {
-  const el = document.querySelector('main')
-  if (el) {
-    el.style.setProperty('padding-right', open ? '480px' : '')
+/**
+ * 同步主内容区（main）右侧留白，避免 AI 抽屉打开时遮挡页面内容。
+ *
+ * 先清除所有 main 上已设置的 padding-right（路由切换后旧 main 可能残留），
+ * 抽屉打开时再给当前页面的 main 应用 DRAWER_WIDTH 宽度的右侧留白。
+ */
+function syncMainPadding() {
+  // 先清除所有 main 上的右侧留白，避免旧路由残留或重复设置
+  document.querySelectorAll('main').forEach((el) => {
+    el.style.removeProperty('padding-right')
+  })
+  // 抽屉未打开时无需为内容区留白
+  if (!drawerOpen.value) {
+    return
   }
+  // 抽屉打开时给当前页面的 main 设置右侧留白，防止内容被抽屉遮挡
+  const mainEl = document.querySelector('main')
+  if (mainEl) {
+    mainEl.style.setProperty('padding-right', `${DRAWER_WIDTH}px`)
+  }
+}
+
+// 抽屉开合或客户端路由切换时同步 main 的右侧留白：
+// 路由切换时 v-main 会被销毁重建，仅监听 drawerOpen 会丢失 padding，因此需同时监听当前路由 path
+watch([drawerOpen, () => getContext().routeInfo.value.curr?.path], async() => {
+  // 路由切换后 v-main 会被销毁重建，需等待新 DOM 渲染完成后再重新应用 padding
+  await nextTick()
+  syncMainPadding()
 })
 
 // 标记位：正在同步服务端确认的授权模式，避免 watcher 向服务端重复发送 SWITCH_MODE
@@ -761,7 +789,10 @@ watch(authMode, (mode) => {
 })
 
 onUnmounted(() => {
-  document.querySelector('main')?.style.removeProperty('padding-right')
+  // 组件卸载时清理所有 main 上的右侧留白，避免 padding 残留影响其他页面
+  document.querySelectorAll('main').forEach((el) => {
+    el.style.removeProperty('padding-right')
+  })
 })
 
 function onInputEnter(e: KeyboardEvent) {
@@ -848,19 +879,6 @@ export default defineComponent({
 
 .chat-header-collapse {
   transition: background-color 0.2s ease;
-}
-
-
-.ai-fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 10000;
-  transition: transform 0.2s ease;
-}
-
-.ai-fab:hover {
-  transform: scale(1.08);
 }
 
 .message-avatar {

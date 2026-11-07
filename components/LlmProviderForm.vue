@@ -108,13 +108,13 @@
               {{ formatContextLength(model.contextLength) }}
             </v-chip>
           </template>
-          <template v-if="model.reasoning">
+          <template v-if="model.reasoningEffect">
             <v-chip
               size="x-small"
               class="ml-1"
               color="primary"
             >
-              {{ model.reasoning }}
+              {{ model.reasoningEffect }}
             </v-chip>
           </template>
         </v-list-item-title>
